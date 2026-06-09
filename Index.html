@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap">
+  <style>
+    :root { --primary: #1a5276; --bg: #f4f7f6; }
+    body { font-family: 'Roboto', sans-serif; margin: 0; background: var(--bg); color: #333; }
+    nav { background: var(--primary); color: white; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
+    .container { padding: 20px; max-width: 800px; margin: auto; }
+    .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; cursor: pointer; transition: 0.3s; }
+    .card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+    .hidden { display: none; }
+    input, button { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+    button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; }
+    button:disabled { background: #95a5a6; cursor: not-allowed; }
+    .search-box { display: flex; gap: 10px; }
+    .result-item { border-bottom: 1px solid #eee; padding: 10px 0; cursor: pointer; }
+    .result-item:hover { background: #f9f9f9; }
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8em; color: white; }
+    .badge-roto { background: #e74c3c; }
+    .loader { color: #7f8c8d; font-style: italic; padding: 10px 0; text-align: center; }
+    .zone-box { background: #e8f4f8; border: 1px solid #bce0ee; padding: 15px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; color: var(--primary); display: flex; justify-content: space-between; align-items: center; }
+  </style>
+  <meta name="theme-color" content="#1a5276">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="<?= config.laboratorio ?>">
+  <script>
+  (function(){
+    var icon='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#1a5276"/><rect x="140" y="165" width="232" height="268" rx="20" fill="white" opacity=".95"/><rect x="196" y="130" width="120" height="55" rx="14" fill="#154360"/><rect x="216" y="142" width="80" height="30" rx="10" fill="#2980b9" opacity=".4"/><rect x="175" y="230" width="140" height="14" rx="7" fill="#1a5276" opacity=".18"/><rect x="175" y="262" width="110" height="14" rx="7" fill="#1a5276" opacity=".18"/><rect x="175" y="294" width="125" height="14" rx="7" fill="#1a5276" opacity=".18"/><rect x="175" y="326" width="85" height="14" rx="7" fill="#1a5276" opacity=".18"/><circle cx="155" cy="237" r="12" fill="#27ae60"/><circle cx="155" cy="269" r="12" fill="#27ae60"/><circle cx="155" cy="301" r="12" fill="#e74c3c"/><circle cx="155" cy="333" r="12" fill="#f39c12"/></svg>';
+    var m={name:'Inventario ' + <?= JSON.stringify(config.laboratorio) ?>,short_name:<?= JSON.stringify(config.laboratorio) ?>,description:'Sistema de Gestión de Inventario para ' + <?= JSON.stringify(config.laboratorio) ?>,start_url:'<?= ScriptApp.getService().getUrl() ?>',display:'standalone',orientation:'portrait',background_color:'#f2f4f7',theme_color:'#1a5276',icons:[{src:'data:image/svg+xml,'+encodeURIComponent(icon),sizes:'any',type:'image/svg+xml',purpose:'any maskable'}]};
+    var b=new Blob([JSON.stringify(m)],{type:'application/manifest+json'});
+    var l=document.createElement('link');l.rel='manifest';l.href=URL.createObjectURL(b);
+    document.head.appendChild(l);
+  })();
+  </script>
+</head>
+<body>
+
+<nav>
+  <div id="nav-title"><?= config.laboratorio ?> - <?= esAdmin ? "Dashboard de Gestión" : "Buscador de Inventario" ?></div>
+  <? if (esAdmin) { ?>
+  <button onclick="showView('home')" style="width:auto; margin:0; padding:5px 15px;">Inicio</button>
+  <? } ?>
+</nav>
+
+<div class="container">
+  <div id="view-home">
+    <h2>Panel de Control</h2>
+    <div class="card" onclick="showView('search')">
+      <h3>🔍 Buscador Global</h3>
+      <p>Localiza stock y ubicación por nombre o coincidencia parcial.</p>
+    </div>
+    <? if (esAdmin) { ?>
+    <div class="card" onclick="loadExploreZones()">
+      <h3>📦 Explorar por Armario</h3>
+      <p>Simula el escaneo de un código QR para ver el contenido tal cual se ve en el móvil.</p>
+    </div>
+    <div class="card" onclick="loadZones()">
+      <h3>📍 Impresión de QRs y Gestión de Zonas</h3>
+      <p>1. Imprimir códigos QR según selección. 2. Agregar, eliminar o editar nombres y descripciones de los sectores. </p>
+    </div>
+    <? } ?>
+  </div>
+
+  <div id="view-search" class="hidden">
+    <button onclick="showView('home')">← Volver</button>
+    <h2>Buscador de Artículos</h2>
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Ej: Lupa, Multímetro..." onkeypress="if(event.key === 'Enter') doSearch()">
+      <button onclick="doSearch()" style="width: 120px; margin-top: 10px;">🔍 Buscar</button>
+    </div>
+    <div id="searchResults"></div>
+  </div>
+
+  <div id="view-explore" class="hidden">
+    <button onclick="showView('home')">← Volver</button>
+    <h2>Seleccionar Ubicación</h2>
+    <div id="exploreList"></div>
+  </div>
+
+<div id="view-zones" class="hidden">
+    <button onclick="showView('home')">← Volver</button>
+    <h2>1. Impresión de Códigos QR</h2>
+    
+    <div style="background: #e8f4f8; padding: 10px; border-radius: 4px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #bce0ee;">
+      <label style="cursor:pointer; font-weight:bold; color:#1a5276;"><input type="checkbox" id="checkAllZones" onclick="toggleAll(this.checked)"> Seleccionar todos</label>
+      <button id="btnQR" onclick="triggerQR(true)" style="width: auto; margin: 0; background: #27ae60; padding: 6px 15px;">🖨️ Imprimir Seleccionados</button>
+    </div>
+
+    <div id="zoneList"></div>
+    <hr>
+    
+    <h2>2. Configuración de Ubicaciones</h2>
+    <h4 id="formZoneTitle">Nueva Zona</h4>
+    <input type="hidden" id="zId"> 
+    <input type="text" id="zNombre" placeholder="Nombre (Ej: Estante Vidriería)">
+    <input type="text" id="zDesc" placeholder="Descripción física">
+    
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <button id="btnSaveZone" onclick="saveZone()" style="flex: 2; min-width: 150px;">Guardar Cambios</button>
+      <button id="btnDeleteZone" onclick="deleteZone()" style="flex: 1; min-width: 100px; background: #e74c3c; display: none;">Eliminar</button> 
+      <button onclick="clearZoneForm()" style="flex: 1; min-width: 100px; background: #7f8c8d;">Cancelar / Nueva</button>
+    </div>
+  </div>
+
+<script>
+  const ES_ADMIN = <?= esAdmin ?>;
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!ES_ADMIN) {
+      showView('search');
+    }
+  });
+
+  let webAppUrl = "";
+
+  // Abre una zona en nueva pestaña mostrando spinner mientras Apps Script responde.
+  // El redirect está embebido en el HTML via window.onload para que el browser
+  // pinte el spinner ANTES de navegar (w.location.replace síncrono no daba tiempo).
+  function abrirConCarga(url) {
+    const w = window.open('', '_blank');
+    if (!w) { window.open(url, '_blank'); return; }
+    const urlJson = JSON.stringify(url); // escape seguro para embeber en JS
+    w.document.write(
+      '<!DOCTYPE html><html>' +
+      '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cargando...</title>' +
+      '<style>' +
+      '*{box-sizing:border-box;margin:0;padding:0}' +
+      'body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f2f4f7}' +
+      '.card{text-align:center;padding:2.5rem 2rem;background:#fff;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.08);max-width:320px;width:90%}' +
+      '.ico{font-size:3rem;margin-bottom:1rem;display:block}' +
+      'h2{font-size:1.1rem;font-weight:600;color:#1a5276;margin:0 0 .4rem}' +
+      'p{color:#94a3b8;font-size:.85rem;margin:0}' +
+      '.sp{width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#1a5276;border-radius:50%;animation:spin .75s linear infinite;margin:1.5rem auto 0}' +
+      '@keyframes spin{to{transform:rotate(360deg)}}' +
+      '</style>' +
+      '<script>window.onload=function(){location.replace(' + urlJson + ')}<\/script>' +
+      '</head>' +
+      '<body><div class="card">' +
+      '<span class="ico">📦</span>' +
+      '<h2>Cargando inventario...</h2>' +
+      '<p>Consultando la base de datos</p>' +
+      '<div class="sp"></div>' +
+      '</div></body></html>'
+    );
+    w.document.close();
+    // NO llamamos w.location.replace() aquí — el redirect está dentro del HTML
+  }
+
+  function showView(viewId) {
+    ['home', 'search', 'explore', 'zones'].forEach(v => document.getElementById('view-' + v).classList.add('hidden'));
+    document.getElementById('view-' + viewId).classList.remove('hidden');
+    if(viewId === 'search') document.getElementById('searchInput').focus();
+  }
+
+  // --- BUSCADOR (Modificado para anclaje) ---
+  function doSearch() {
+    const q = document.getElementById('searchInput').value.trim();
+    const div = document.getElementById('searchResults');
+    
+    if (q.length < 2) {
+      div.innerHTML = '<div class="loader">Escribe al menos 2 caracteres.</div>';
+      return;
+    }
+    
+    div.innerHTML = '<div class="loader">⏳ Buscando en inventario, espere...</div>';
+    
+    const ejecutarBusqueda = function(url) {
+      webAppUrl = url;
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res || res.length === 0) {
+            div.innerHTML = '<div class="loader">No se encontraron coincidencias.</div>';
+            return;
+          }
+          let htmlStr = "";
+          res.forEach(function(item) {
+            const ubi = item.ubicacion ? item.ubicacion.toString().trim() : "";
+            const link = ubi ? webAppUrl + "?zona=" + encodeURIComponent(ubi) + "#item-" + item.fila : null;
+            const clickAttr = link ? 'onclick="abrirConCarga(\'' + link + '\')"' : '';
+            const styleAttr = link ? 'style="cursor:pointer;" title="Ir al armario"' : '';
+            const icon = link ? ' 🔗' : '';
+            htmlStr += '<div class="result-item" ' + clickAttr + ' ' + styleAttr + '>' +
+              '<strong>' + item.articulo + icon + '</strong><br>' +
+              '<small>📍 ' + (ubi || 'Sin ubicación') + ' | ✅ ' + item.bien + ' | ⚠️ ' + item.regular + ' | ❌ ' + item.roto + '</small>' +
+              '</div>';
+          });
+          div.innerHTML = htmlStr;
+        })
+        .withFailureHandler(function(err) {
+          div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error al buscar: ' + err.message + '</div>';
+        })
+        .buscarEnInventario(q);
+    };
+
+    if (!webAppUrl) {
+      google.script.run.withSuccessHandler(ejecutarBusqueda).getScriptUrl();
+    } else {
+      ejecutarBusqueda(webAppUrl);
+    }
+  }
+
+  // --- EXPLORADOR (ACCESOS DIRECTOS A VISTA MÓVIL) ---
+  function loadExploreZones() {
+    showView('explore');
+    const div = document.getElementById('exploreList');
+    div.innerHTML = '<div class="loader">⏳ Obteniendo URL del sistema...</div>';
+    
+    google.script.run
+      .withSuccessHandler(url => {
+        webAppUrl = url;
+        div.innerHTML = '<div class="loader">⏳ Cargando armarios...</div>';
+        google.script.run
+          .withSuccessHandler(res => {
+            div.innerHTML = res.map(z =>
+              `<div class="zone-box" onclick="abrirConCarga('${webAppUrl}?zona=${encodeURIComponent(z[1])}')">
+                <span>📍 ${z[1]}</span>
+                <span style="font-size: 0.8em; background: #fff; padding: 2px 8px; border-radius: 10px; color: #666;">Abrir Vista QR →</span>
+              </div>`
+            ).join('');
+          })
+          .withFailureHandler(err => {
+            div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error: ' + err.message + '</div>';
+          })
+          .obtenerZonasAdmin();
+      })
+      .withFailureHandler(err => {
+        div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error al obtener URL: ' + err.message + '</div>';
+      })
+      .getScriptUrl();
+  }
+
+  // --- ZONAS ---
+  function loadZones() {
+    showView('zones');
+    clearZoneForm();
+    const div = document.getElementById('zoneList');
+    div.innerHTML = '<div class="loader">⏳ Cargando zonas existentes...</div>';
+    google.script.run
+      .withSuccessHandler(res => {
+        div.innerHTML = res.map(z =>
+          `<div class="result-item" style="display:flex; align-items:center; gap:10px;">
+            <input type="checkbox" name="zoneSelect" value="${z[0]}" style="width:auto; margin:0; transform:scale(1.2); cursor:pointer;">
+            <div onclick="editZone('${z[0]}','${z[1]}','${z[2]}')" style="flex:1; cursor:pointer;">
+              <strong>${z[0]}</strong>: ${z[1]}
+            </div>
+          </div>`
+        ).join('');
+      })
+      .withFailureHandler(err => {
+        div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error al cargar zonas: ' + err.message + '</div>';
+      })
+      .obtenerZonasAdmin();
+  }
+
+  function editZone(id, nombre, desc) {
+  document.getElementById('zId').value = id;
+  document.getElementById('zNombre').value = nombre;
+  // Manejo de descripciones vacías para evitar que diga "undefined"
+  document.getElementById('zDesc').value = (desc && desc !== 'undefined') ? desc : ''; 
+  document.getElementById('formZoneTitle').innerText = 'Editando: ' + id;
+  
+  // Mostrar el botón de Eliminar
+  document.getElementById('btnDeleteZone').style.display = 'block'; 
+  
+  // Bajar el scroll hasta el formulario
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+}
+
+  function clearZoneForm() {
+  document.getElementById('zId').value = '';
+  document.getElementById('zNombre').value = '';
+  document.getElementById('zDesc').value = '';
+  document.getElementById('formZoneTitle').innerText = 'Nueva Zona';
+  
+  // Ocultar el botón de Eliminar al volver al modo "Nueva"
+  document.getElementById('btnDeleteZone').style.display = 'none'; 
+}
+
+function deleteZone() {
+  const id = document.getElementById('zId').value;
+  const nombre = document.getElementById('zNombre').value;
+  
+  if (!confirm("¿Estás seguro de que quieres eliminar la zona '" + nombre + "'?")) return;
+
+  const btn = document.getElementById('btnDeleteZone');
+  btn.disabled = true;
+  btn.innerText = "Verificando...";
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      alert(res.msg);
+      if (res.success) {
+        loadZones();
+        clearZoneForm();
+      }
+      btn.disabled = false;
+      btn.innerText = "Eliminar Zona";
+    })
+    .withFailureHandler(function(err) {
+      alert('Error al eliminar: ' + err.message);
+      btn.disabled = false;
+      btn.innerText = "Eliminar Zona";
+    })
+    .eliminarZona(id, nombre);
+}
+
+  function saveZone() {
+    const btn = document.getElementById('btnSaveZone');
+    const id = document.getElementById('zId').value;
+    const n = document.getElementById('zNombre').value;
+    const d = document.getElementById('zDesc').value;
+    if(!n) return alert('El nombre es obligatorio.');
+    btn.disabled = true; btn.innerText = 'Guardando...';
+    google.script.run
+      .withSuccessHandler((res) => {
+        alert(res.msg); loadZones(); btn.disabled = false; btn.innerText = 'Guardar Cambios';
+      })
+      .withFailureHandler((err) => {
+        alert('Error al guardar: ' + err.message); btn.disabled = false; btn.innerText = 'Guardar Cambios';
+      })
+      .guardarZona(id, n, d);
+  }
+
+  // --- QR ---
+  function triggerQR(isSelective = false) {
+    let selectedIds = [];
+    
+    if (isSelective) {
+      const checkboxes = document.getElementsByName('zoneSelect');
+      selectedIds = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+      if (selectedIds.length === 0) return alert('Selecciona al menos una zona para imprimir.');
+    }
+    const msg = isSelective 
+      ? `¿Generar QRs para las ${selectedIds.length} zonas seleccionadas? Esto modificará la hoja IMPRIMIR_QR.` 
+      : '¿Generar todos los QRs ahora? Esto modificará la hoja IMPRIMIR_QR.';
+      
+    if (!confirm(msg)) return;
+    
+    const btn = document.getElementById('btnQR');
+    if (btn) { btn.innerText = '⏳ Generando...'; btn.disabled = true; }
+    
+    google.script.run
+      .withSuccessHandler(resMsg => {
+        alert(resMsg);
+        if (btn) { btn.innerText = 'Generar Ahora'; btn.disabled = false; }
+      })
+      .withFailureHandler(err => {
+        alert('Error al generar QRs: ' + err.message);
+        if (btn) { btn.innerText = 'Generar Ahora'; btn.disabled = false; }
+      })
+      .ejecutarGeneracionQR(selectedIds);
+  }
+  function toggleAll(source) {
+    const checkboxes = document.getElementsByName('zoneSelect');
+    checkboxes.forEach(cb => cb.checked = source);
+  }
+
+</script>
+
+<footer style="text-align:center; padding:1.5rem 1rem 2rem; color:#94a3b8; font-size:0.75rem; border-top:1px solid #e2e8f0; margin-top:2rem;">
+  🄯 <?= new Date().getFullYear() ?> &nbsp;·&nbsp; Sistema de Inventario — <?= config.laboratorio ?> &nbsp;·&nbsp; <strong style="color:#64748b;">v<?= APP_VERSION ?></strong> &nbsp;·&nbsp; <a href="mailto:trujillo.leonardo@gmail.com?subject=Comentario%20-%20Sistema%20de%20Inventario%20<?= encodeURIComponent(config.laboratorio) ?>" style="color:#94a3b8;">Comentarios</a>
+</footer>
+
+</body>
+</html>

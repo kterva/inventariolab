@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gestor de Inventario - Bienvenido</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      background: #f2f4f7;
+      color: #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+      box-sizing: border-box;
+    }
+    .card {
+      background: #fff;
+      padding: 2.5rem 2rem;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      max-width: 450px;
+      width: 100%;
+      text-align: center;
+      border-top: 5px solid #27ae60;
+    }
+    .icon {
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+    h2 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #1a5276;
+      margin: 0 0 0.5rem 0;
+    }
+    p {
+      color: #4a5568;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin: 0 0 1.5rem 0;
+    }
+    .input-group {
+      text-align: left;
+      margin-bottom: 1.5rem;
+    }
+    .input-group label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      color: #2c3e50;
+      font-size: 0.9rem;
+    }
+    .input-group input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+    .input-group input:focus {
+      outline: none;
+      border-color: #27ae60;
+    }
+    .btn {
+      display: inline-block;
+      width: 100%;
+      padding: 14px;
+      background: #27ae60;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.05rem;
+      font-weight: bold;
+      cursor: pointer;
+      text-decoration: none;
+      box-sizing: border-box;
+      transition: background 0.2s;
+    }
+    .btn:hover {
+      background: #219653;
+    }
+    .help-text {
+      font-size: 0.8rem;
+      color: #718096;
+      margin-top: 1rem;
+      line-height: 1.4;
+    }
+    .new-school-box {
+      margin-top: 2rem;
+      padding: 1.2rem;
+      background: #e8f4f8;
+      border: 1px solid #bce0ee;
+      border-radius: 8px;
+      text-align: left;
+    }
+    .new-school-box h3 {
+      margin-top: 0;
+      color: #1a5276;
+      font-size: 1.05rem;
+      margin-bottom: 0.8rem;
+    }
+    .new-school-box ol {
+      padding-left: 1.2rem;
+      margin-bottom: 0;
+      font-size: 0.9rem;
+      color: #2c3e50;
+      line-height: 1.5;
+    }
+    .new-school-box a {
+      color: #27ae60;
+      font-weight: bold;
+      text-decoration: none;
+    }
+    .new-school-box a:hover {
+      text-decoration: underline;
+    }
+    .new-school-box code {
+      background: #fff;
+      padding: 4px 8px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-top: 6px;
+      user-select: all;
+      border: 1px solid #ccc;
+      font-size: 0.85rem;
+      color: #c0392b;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="icon">👋</span>
+    <h2>Bienvenido al Inventario</h2>
+    <p>Ingresa al sistema conectando tu base de datos de Google Sheets.</p>
+    
+    <div class="input-group">
+      <label for="sheetId">ID o URL de tu planilla de Google Sheets:</label>
+      <input type="text" id="sheetId" placeholder="Ej: 1kp3Rs5WfrePoIkoOCBs..." onkeypress="if(event.key === 'Enter') ingresar()">
+    </div>
+    
+    <button class="btn" onclick="ingresar()">Ir a mi Laboratorio</button>
+
+    <div class="help-text">
+      <strong>¿Dónde encuentro el ID?</strong><br>
+      Abre tu planilla en Google Sheets y copia el código largo que aparece en la URL después de <code>/d/</code> y antes de <code>/edit</code>.
+    </div>
+
+    <div class="new-school-box">
+      <h3>🚀 ¿Quieres usar este sistema en tu laboratorio?</h3>
+      <ol>
+        <li><a href="#" onclick="alert('Debes reemplazar este enlace (#) en views/home.ejs por el link a tu planilla modelo finalizando en /copy'); return false;">Haz clic aquí para crear una copia de la Planilla Modelo</a> en tu propio Google Drive.</li>
+        <li>En tu nueva planilla, haz clic en el botón verde de <strong>Compartir</strong> y dale permisos de <em>Editor</em> al sistema copiando este correo:<br>
+          <code><%= serviceAccountEmail %></code>
+        </li>
+        <li>Copia el enlace o ID de tu nueva planilla y pégalo en la caja de arriba para comenzar a gestionar tu inventario.</li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    function ingresar() {
+      let input = document.getElementById('sheetId').value.trim();
+      if (!input) return alert("Por favor, ingresa el ID o la URL de la planilla.");
+      
+      // Extraer ID si el usuario pegó la URL completa
+      let idMatches = input.match(/\/d\/(.*?)(\/|$)/);
+      let finalId = idMatches ? idMatches[1] : input;
+      
+      // Limpiar parámetros extra si los hay
+      finalId = finalId.split('?')[0];
+
+      if (finalId.length < 20) {
+        return alert("El ID proporcionado parece ser incorrecto o muy corto.");
+      }
+
+      // Redirigir al laboratorio correspondiente
+      window.location.href = "/inventariolab/lab/" + finalId;
+    }
+  </script>
+</body>
+</html>

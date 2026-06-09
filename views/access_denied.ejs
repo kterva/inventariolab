@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acceso Denegado</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      background: #f2f4f7;
+      color: #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+      box-sizing: border-box;
+    }
+    .card {
+      background: #fff;
+      padding: 2.5rem 2rem;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      border-top: 5px solid #d35400;
+    }
+    .icon {
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+    h2 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: #1a5276;
+      margin: 0 0 1rem 0;
+    }
+    p {
+      color: #4a5568;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin: 0 0 1.5rem 0;
+    }
+    .footer-info {
+      font-size: 0.8rem;
+      color: #718096;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 1rem;
+      margin-top: 1.5rem;
+      word-break: break-all;
+    }
+    .badge {
+      background: #edf2f7;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #4a5568;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="icon">🔒</span>
+    <h2>Acceso no autorizado</h2>
+    <p>No estás autorizado. Pide acceso a la aplicación para ver el contenido del armario o acceder al panel.</p>
+    <div class="footer-info">
+      <% if (email) { %>
+        Sesión activa: <span class="badge"><%= email %></span><br><br>
+        Pide al administrador que registre esta dirección en la hoja de configuración de <b><%= config.laboratorio %></b>.
+      <% } else { %>
+        Asegúrate de haber iniciado sesión con tu cuenta.
+      <% } %>
+    </div>
+  </div>
+</body>
+</html>

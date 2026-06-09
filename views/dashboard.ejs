@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap">
+  <title>Dashboard - <%= config.laboratorio %></title>
+  <style>
+    :root { --primary: #1a5276; --bg: #f4f7f6; }
+    body { font-family: 'Roboto', sans-serif; margin: 0; background: var(--bg); color: #333; }
+    nav { background: var(--primary); color: white; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
+    .container { padding: 20px; max-width: 800px; margin: auto; }
+    .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; cursor: pointer; transition: 0.3s; }
+    .card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+    .hidden { display: none; }
+    input, button { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+    button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; }
+    button:disabled { background: #95a5a6; cursor: not-allowed; }
+    .search-box { display: flex; gap: 10px; }
+    .result-item { border-bottom: 1px solid #eee; padding: 10px 0; cursor: pointer; }
+    .result-item:hover { background: #f9f9f9; }
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8em; color: white; }
+    .badge-roto { background: #e74c3c; }
+    .loader { color: #7f8c8d; font-style: italic; padding: 10px 0; text-align: center; }
+    .zone-box { background: #e8f4f8; border: 1px solid #bce0ee; padding: 15px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; color: var(--primary); display: flex; justify-content: space-between; align-items: center; }
+    .logout-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); padding: 5px 10px; border-radius: 4px; color: white; text-decoration: none; font-size: 0.85rem; margin-left: 10px; }
+  </style>
+  <meta name="theme-color" content="#1a5276">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="<%= config.laboratorio %>">
+</head>
+<body>
+
+<nav>
+  <div id="nav-title"><%= config.laboratorio %> - <%= esAdmin ? "Dashboard" : "Buscador" %></div>
+  <div style="display: flex; align-items: center;">
+    <% if (esAdmin) { %>
+      <button onclick="showView('home')" style="width:auto; margin:0; padding:5px 15px;">Inicio</button>
+    <% } %>
+    <a href="/inventariolab/lab/<%= labId %>/logout" class="logout-btn">Salir</a>
+  </div>
+</nav>
+
+<div class="container">
+  <div id="view-home">
+    <h2>Panel de Control</h2>
+    <div class="card" onclick="showView('search')">
+      <h3>🔍 Buscador Global</h3>
+      <p>Localiza stock y ubicación por nombre o coincidencia parcial.</p>
+    </div>
+    <% if (esAdmin) { %>
+    <div class="card" onclick="loadExploreZones()">
+      <h3>📦 Explorar por Armario</h3>
+      <p>Simula el escaneo de un código QR para ver el contenido tal cual se ve en el móvil.</p>
+    </div>
+    <div class="card" onclick="loadZones()">
+      <h3>📍 Impresión de QRs y Gestión de Zonas</h3>
+      <p>1. Imprimir códigos QR según selección. 2. Agregar, eliminar o editar nombres y descripciones de los sectores. </p>
+    </div>
+    <% } %>
+  </div>
+
+  <div id="view-search" class="hidden">
+    <button onclick="showView('home')">← Volver</button>
+    <h2>Buscador de Artículos</h2>
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Ej: Lupa, Multímetro..." onkeypress="if(event.key === 'Enter') doSearch()">
+      <button onclick="doSearch()" style="width: 120px; margin-top: 10px;">🔍 Buscar</button>
+    </div>
+    <div id="searchResults"></div>
+  </div>
+
+  <div id="view-explore" class="hidden">
+    <button onclick="showView('home')">← Volver</button>
+    <h2>Seleccionar Ubicación</h2>
+    <div id="exploreList"></div>
+  </div>
+
+<div id="view-zones" class="hidden">
+    <button onclick="showView('home')">← Volver</button>
+    <h2>1. Impresión de Códigos QR</h2>
+    
+    <div style="background: #e8f4f8; padding: 10px; border-radius: 4px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #bce0ee;">
+      <label style="cursor:pointer; font-weight:bold; color:#1a5276;"><input type="checkbox" id="checkAllZones" onclick="toggleAll(this.checked)"> Seleccionar todos</label>
+      <button id="btnQR" onclick="triggerQR(true)" style="width: auto; margin: 0; background: #27ae60; padding: 6px 15px;">🖨️ Imprimir Seleccionados</button>
+    </div>
+
+    <div id="zoneList"></div>
+    <hr>
+    
+    <h2>2. Configuración de Ubicaciones</h2>
+    <h4 id="formZoneTitle">Nueva Zona</h4>
+    <input type="hidden" id="zId"> 
+    <input type="text" id="zNombre" placeholder="Nombre (Ej: Estante Vidriería)">
+    <input type="text" id="zDesc" placeholder="Descripción física">
+    
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <button id="btnSaveZone" onclick="saveZone()" style="flex: 2; min-width: 150px;">Guardar Cambios</button>
+      <button id="btnDeleteZone" onclick="deleteZone()" style="flex: 1; min-width: 100px; background: #e74c3c; display: none;">Eliminar</button> 
+      <button onclick="clearZoneForm()" style="flex: 1; min-width: 100px; background: #7f8c8d;">Cancelar / Nueva</button>
+    </div>
+  </div>
+
+<script>
+  const ES_ADMIN = <%= esAdmin %>;
+  const LAB_ID = "<%= labId %>";
+  const WEB_APP_URL = "/inventariolab/lab/" + LAB_ID;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!ES_ADMIN) {
+      showView('search');
+    }
+  });
+
+  function abrirConCarga(url) {
+    const w = window.open('', '_blank');
+    if (!w) { window.open(url, '_blank'); return; }
+    const urlJson = JSON.stringify(url);
+    w.document.write(
+      '<!DOCTYPE html><html>' +
+      '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cargando...</title>' +
+      '<style>' +
+      '*{box-sizing:border-box;margin:0;padding:0}' +
+      'body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f2f4f7}' +
+      '.card{text-align:center;padding:2.5rem 2rem;background:#fff;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.08);max-width:320px;width:90%}' +
+      '.ico{font-size:3rem;margin-bottom:1rem;display:block}' +
+      'h2{font-size:1.1rem;font-weight:600;color:#1a5276;margin:0 0 .4rem}' +
+      'p{color:#94a3b8;font-size:.85rem;margin:0}' +
+      '.sp{width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#1a5276;border-radius:50%;animation:spin .75s linear infinite;margin:1.5rem auto 0}' +
+      '@keyframes spin{to{transform:rotate(360deg)}}' +
+      '</style>' +
+      '<script>window.onload=function(){location.replace(' + urlJson + ')}<\/script>' +
+      '</head>' +
+      '<body><div class="card">' +
+      '<span class="ico">📦</span>' +
+      '<h2>Cargando inventario...</h2>' +
+      '<p>Consultando la base de datos</p>' +
+      '<div class="sp"></div>' +
+      '</div></body></html>'
+    );
+    w.document.close();
+  }
+
+  function showView(viewId) {
+    ['home', 'search', 'explore', 'zones'].forEach(v => document.getElementById('view-' + v).classList.add('hidden'));
+    document.getElementById('view-' + viewId).classList.remove('hidden');
+    if(viewId === 'search') document.getElementById('searchInput').focus();
+  }
+
+  async function doSearch() {
+    const q = document.getElementById('searchInput').value.trim();
+    const div = document.getElementById('searchResults');
+    
+    if (q.length < 2) {
+      div.innerHTML = '<div class="loader">Escribe al menos 2 caracteres.</div>';
+      return;
+    }
+    
+    div.innerHTML = '<div class="loader">⏳ Buscando en inventario, espere...</div>';
+    
+    try {
+      const res = await fetch(`/inventariolab/lab/${LAB_ID}/api/buscar?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error de servidor');
+      
+      if (!data || data.length === 0) {
+        div.innerHTML = '<div class="loader">No se encontraron coincidencias.</div>';
+        return;
+      }
+      
+      let htmlStr = "";
+      data.forEach(function(item) {
+        const ubi = item.ubicacion ? item.ubicacion.toString().trim() : "";
+        const link = ubi ? WEB_APP_URL + "?zona=" + encodeURIComponent(ubi) + "#item-" + item.fila : null;
+        const clickAttr = link ? `onclick="abrirConCarga('${link}')"` : '';
+        const styleAttr = link ? 'style="cursor:pointer;" title="Ir al armario"' : '';
+        const icon = link ? ' 🔗' : '';
+        htmlStr += '<div class="result-item" ' + clickAttr + ' ' + styleAttr + '>' +
+          '<strong>' + item.articulo + icon + '</strong><br>' +
+          '<small>📍 ' + (ubi || 'Sin ubicación') + ' | ✅ ' + item.bien + ' | ⚠️ ' + item.regular + ' | ❌ ' + item.roto + '</small>' +
+          '</div>';
+      });
+      div.innerHTML = htmlStr;
+    } catch (err) {
+      div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error al buscar: ' + err.message + '</div>';
+    }
+  }
+
+  async function loadExploreZones() {
+    showView('explore');
+    const div = document.getElementById('exploreList');
+    div.innerHTML = '<div class="loader">⏳ Cargando armarios...</div>';
+    
+    try {
+      const res = await fetch(`/inventariolab/lab/${LAB_ID}/api/zonas`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error de servidor');
+      
+      div.innerHTML = data.map(z =>
+        `<div class="zone-box" onclick="abrirConCarga('${WEB_APP_URL}?zona=${encodeURIComponent(z[1])}')">
+          <span>📍 ${z[1]}</span>
+          <span style="font-size: 0.8em; background: #fff; padding: 2px 8px; border-radius: 10px; color: #666;">Abrir Vista QR →</span>
+        </div>`
+      ).join('');
+    } catch (err) {
+      div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error: ' + err.message + '</div>';
+    }
+  }
+
+  async function loadZones() {
+    showView('zones');
+    clearZoneForm();
+    const div = document.getElementById('zoneList');
+    div.innerHTML = '<div class="loader">⏳ Cargando zonas existentes...</div>';
+    
+    try {
+      const res = await fetch(`/inventariolab/lab/${LAB_ID}/api/zonas`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error de servidor');
+      
+      div.innerHTML = data.map(z =>
+        `<div class="result-item" style="display:flex; align-items:center; gap:10px;">
+          <input type="checkbox" name="zoneSelect" value="${z[0]}" style="width:auto; margin:0; transform:scale(1.2); cursor:pointer;">
+          <div onclick="editZone('${z[0]}','${z[1]}','${z[2]}')" style="flex:1; cursor:pointer;">
+            <strong>${z[0]}</strong>: ${z[1]}
+          </div>
+        </div>`
+      ).join('');
+    } catch (err) {
+      div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error al cargar zonas: ' + err.message + '</div>';
+    }
+  }
+
+  function editZone(id, nombre, desc) {
+    document.getElementById('zId').value = id;
+    document.getElementById('zNombre').value = nombre;
+    document.getElementById('zDesc').value = (desc && desc !== 'undefined') ? desc : ''; 
+    document.getElementById('formZoneTitle').innerText = 'Editando: ' + id;
+    document.getElementById('btnDeleteZone').style.display = 'block'; 
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  }
+
+  function clearZoneForm() {
+    document.getElementById('zId').value = '';
+    document.getElementById('zNombre').value = '';
+    document.getElementById('zDesc').value = '';
+    document.getElementById('formZoneTitle').innerText = 'Nueva Zona';
+    document.getElementById('btnDeleteZone').style.display = 'none'; 
+  }
+
+  async function deleteZone() {
+    const id = document.getElementById('zId').value;
+    const nombre = document.getElementById('zNombre').value;
+    
+    if (!confirm("¿Estás seguro de que quieres eliminar la zona '" + nombre + "'?")) return;
+
+    const btn = document.getElementById('btnDeleteZone');
+    btn.disabled = true;
+    btn.innerText = "Verificando...";
+
+    try {
+      const res = await fetch(`/inventariolab/lab/${LAB_ID}/api/eliminar-zona`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, nombre })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error de servidor');
+      
+      alert(data.msg);
+      if (data.success) {
+        loadZones();
+        clearZoneForm();
+      }
+    } catch (err) {
+      alert('Error al eliminar: ' + err.message);
+    }
+    btn.disabled = false;
+    btn.innerText = "Eliminar Zona";
+  }
+
+  async function saveZone() {
+    const btn = document.getElementById('btnSaveZone');
+    const id = document.getElementById('zId').value;
+    const n = document.getElementById('zNombre').value;
+    const d = document.getElementById('zDesc').value;
+    if(!n) return alert('El nombre es obligatorio.');
+    
+    btn.disabled = true; btn.innerText = 'Guardando...';
+    try {
+      const res = await fetch(`/inventariolab/lab/${LAB_ID}/api/guardar-zona`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, nombre: n, desc: d })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error de servidor');
+      
+      alert(data.msg);
+      loadZones();
+    } catch (err) {
+      alert('Error al guardar: ' + err.message);
+    }
+    btn.disabled = false; btn.innerText = 'Guardar Cambios';
+  }
+
+  async function triggerQR(isSelective = false) {
+    let selectedIds = [];
+    
+    if (isSelective) {
+      const checkboxes = document.getElementsByName('zoneSelect');
+      selectedIds = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+      if (selectedIds.length === 0) return alert('Selecciona al menos una zona para imprimir.');
+    }
+    const msg = isSelective 
+      ? `¿Generar QRs para las ${selectedIds.length} zonas seleccionadas? Esto modificará la hoja IMPRIMIR_QR.` 
+      : '¿Generar todos los QRs ahora? Esto modificará la hoja IMPRIMIR_QR.';
+      
+    if (!confirm(msg)) return;
+    
+    const btn = document.getElementById('btnQR');
+    if (btn) { btn.innerText = '⏳ Generando...'; btn.disabled = true; }
+    
+    try {
+      const res = await fetch(`/inventariolab/lab/${LAB_ID}/api/generar-qrs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listaIds: selectedIds })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error de servidor');
+      
+      alert(data.msg);
+    } catch (err) {
+      alert('Error al generar QRs: ' + err.message);
+    }
+    if (btn) { btn.innerText = '🖨️ Imprimir Seleccionados'; btn.disabled = false; }
+  }
+
+  function toggleAll(source) {
+    const checkboxes = document.getElementsByName('zoneSelect');
+    checkboxes.forEach(cb => cb.checked = source);
+  }
+
+</script>
+
+<footer style="text-align:center; padding:1.5rem 1rem 2rem; color:#94a3b8; font-size:0.75rem; border-top:1px solid #e2e8f0; margin-top:2rem;">
+  🄯 <%= new Date().getFullYear() %> &nbsp;·&nbsp; Sistema de Inventario — <%= config.laboratorio %> &nbsp;·&nbsp; <strong style="color:#64748b;">vVPS</strong>
+</footer>
+
+</body>
+</html>

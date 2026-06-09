@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login - <%= config.laboratorio %></title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      background: #f2f4f7;
+      color: #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+      box-sizing: border-box;
+    }
+    .card {
+      background: #fff;
+      padding: 2.5rem 2rem;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      border-top: 5px solid #1a5276;
+    }
+    .icon {
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+    h2 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: #1a5276;
+      margin: 0 0 1rem 0;
+    }
+    p {
+      color: #4a5568;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin: 0 0 1.5rem 0;
+    }
+    .btn {
+      display: inline-block;
+      width: 100%;
+      padding: 12px;
+      background: #1a5276;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      text-decoration: none;
+      margin-bottom: 10px;
+      box-sizing: border-box;
+    }
+    .btn-mock {
+      background: #e74c3c;
+    }
+    .footer-info {
+      font-size: 0.8rem;
+      color: #718096;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 1rem;
+      margin-top: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="icon">🔬</span>
+    <h2><%= config.laboratorio %></h2>
+    <p><%= config.institucion %><br>Acceso requerido para docentes y administradores.</p>
+    
+    <a href="/inventariolab/auth/google?labId=<%= labId %>&redirect=<%= encodeURIComponent(redirect) %>" class="btn">
+      Inicia Sesión con Google
+    </a>
+
+    <% if (mockEmail) { %>
+      <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+      <p style="font-size: 0.85rem; color: #7f8c8d;">Entorno de Desarrollo</p>
+      <form method="POST" action="/inventariolab/lab/<%= labId %>/login/mock">
+        <input type="hidden" name="redirect" value="<%= redirect %>">
+        <input type="hidden" name="email" value="<%= mockEmail %>">
+        <button type="submit" class="btn btn-mock">Acceder como <%= mockEmail %></button>
+      </form>
+    <% } %>
+
+    <div class="footer-info">
+      Debes ingresar con el correo autorizado en la configuración del laboratorio.
+    </div>
+  </div>
+</body>
+</html>

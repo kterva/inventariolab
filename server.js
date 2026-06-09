@@ -1,0 +1,264 @@
+require('dotenv').config();
+const express = require('express');
+const session = require('express-session');
+const path = require('path');
+const googleClient = require('./googleClient');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Configurar EJS
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+// Middlewares
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 1 día
+}));
+
+// Servir archivos estáticos si los hubiera
+app.use('/inventariolab/public', express.static(path.join(__dirname, 'public')));
+
+// Router para el subpath
+const router = express.Router();
+
+// Middleware de inyección de configuración
+router.use('/lab/:labId', async (req, res, next) => {
+  if (req.path.includes('/api/')) return next();
+  try {
+    const config = await googleClient.getAppConfig(req.params.labId);
+    req.appConfig = config;
+    next();
+  } catch (err) {
+    console.error('Error al obtener config:', err);
+    res.status(500).send('Error de servidor al contactar Google Sheets.');
+  }
+});
+
+// ─── RUTAS DE VISTAS ──────────────────────────────────
+
+router.get('/lab/:labId/login', (req, res) => {
+  const { labId } = req.params;
+  const redirect = req.query.redirect || `/inventariolab/lab/${labId}`;
+  res.render('login', { labId, redirect, config: req.appConfig, mockEmail: process.env.MOCK_AUTH_EMAIL });
+});
+
+router.post('/lab/:labId/login/mock', async (req, res) => {
+  if (process.env.NODE_ENV !== 'development' && !process.env.MOCK_AUTH_EMAIL) {
+    return res.status(403).send('Mock login deshabilitado');
+  }
+  const { labId } = req.params;
+  const email = req.body.email || process.env.MOCK_AUTH_EMAIL;
+  
+  // Guardamos sesión simple
+  req.session.email = email;
+  req.session.labId = labId;
+  
+  const redirect = req.body.redirect || `/inventariolab/lab/${labId}`;
+  res.redirect(redirect);
+});
+
+router.get('/lab/:labId/logout', (req, res) => {
+  req.session.destroy();
+  res.redirect(`/inventariolab/lab/${req.params.labId}/login`);
+});
+
+router.get('/lab/:labId', async (req, res) => {
+  const { labId } = req.params;
+  const { zona } = req.query;
+  const email = req.session.email;
+
+  // Si tiene zona (Vista de armario)
+  if (zona) {
+    let autorizado = false;
+    let esAdmin = false;
+
+    if (email && req.session.labId === labId) {
+      const permisos = await googleClient.verificarPermisos(labId, email);
+      autorizado = permisos.autorizado;
+      esAdmin = permisos.esAdmin;
+    }
+
+    if (req.appConfig.accesoPublico === 'NO' && !autorizado) {
+      return res.redirect(`/inventariolab/lab/${labId}/login?redirect=${encodeURIComponent(req.originalUrl)}`);
+    }
+
+    try {
+      const filas = await googleClient.getFilasPorZona(labId, zona);
+      const zonasAdmin = esAdmin ? await googleClient.obtenerZonasAdmin(labId) : [];
+      const arrayZonas = zonasAdmin.map(z => (z[1] || '').toString().trim()).filter(String);
+      
+      const config = { ...req.appConfig, esAdmin, autorizado, email, zonasAdmin: arrayZonas };
+      
+      return res.render('armario', { zona, filas, config, labId });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).send('Error cargando zona');
+    }
+  }
+
+  // Vista Dashboard (Buscador Global) - Requiere Login
+  if (!email || req.session.labId !== labId) {
+    return res.redirect(`/inventariolab/lab/${labId}/login`);
+  }
+
+  const permisos = await googleClient.verificarPermisos(labId, email);
+  if (!permisos.autorizado) {
+    return res.render('access_denied', { email, config: req.appConfig });
+  }
+
+  return res.render('dashboard', { 
+    config: req.appConfig, 
+    esAdmin: permisos.esAdmin,
+    email,
+    labId 
+  });
+});
+
+// ─── GOOGLE OAUTH CALLBACK ───────────────────────────
+// En una implementación real de OAuth2, usarías un paquete como passport-google-oauth20.
+// Para mantener simple la estructura base según el plan, se recomienda implementar
+// el callback nativo o usar Passport si se requiere.
+router.get('/auth/google', (req, res) => {
+  const labId = req.query.labId;
+  // TODO: Redirigir a URL de consentimiento de Google OAuth 2.0
+  res.send('Google OAuth no implementado por completo en la plantilla. Utiliza Mock Login.');
+});
+
+router.get('/auth/google/callback', (req, res) => {
+  // TODO: Recibir code, intercambiar por token, obtener perfil y setear req.session.email
+  res.send('Google OAuth Callback.');
+});
+
+
+// ─── API ENDPOINTS (Backend Auth) ─────────────────────
+
+// Middleware para APIs protegidas
+const apiAuth = async (req, res, next) => {
+  const email = req.session.email;
+  const labId = req.params.labId;
+  if (!email || req.session.labId !== labId) return res.status(401).json({ error: 'No autenticado' });
+  
+  const permisos = await googleClient.verificarPermisos(labId, email);
+  if (!permisos.autorizado) return res.status(403).json({ error: 'No autorizado' });
+  
+  req.userPermisos = permisos;
+  req.userEmail = email;
+  next();
+};
+
+const requireAdmin = (req, res, next) => {
+  if (!req.userPermisos.esAdmin) return res.status(403).json({ error: 'Solo administradores' });
+  next();
+};
+
+router.get('/lab/:labId/api/buscar', apiAuth, async (req, res) => {
+  try {
+    const resultados = await googleClient.buscarEnInventario(req.params.labId, req.query.q || '');
+    res.json(resultados);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/lab/:labId/api/reportar', apiAuth, async (req, res) => {
+  try {
+    const { fila, texto } = req.body;
+    await googleClient.registrarReporte(req.params.labId, req.userEmail, fila, texto);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/lab/:labId/api/foto', apiAuth, requireAdmin, async (req, res) => {
+  try {
+    const { fila, base64, nombreArchivo } = req.body;
+    const url = await googleClient.subirFoto(req.params.labId, req.userEmail, fila, base64, nombreArchivo);
+    res.json({ url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/lab/:labId/api/mover', apiAuth, requireAdmin, async (req, res) => {
+  try {
+    const { fila, nuevaZona } = req.body;
+    await googleClient.cambiarUbicacion(req.params.labId, req.userEmail, fila, nuevaZona);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/lab/:labId/api/guardar-zona', apiAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id, nombre, desc } = req.body;
+    const result = await googleClient.guardarZona(req.params.labId, id, nombre, desc);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/lab/:labId/api/eliminar-zona', apiAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id, nombre } = req.body;
+    const result = await googleClient.eliminarZona(req.params.labId, id, nombre);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/lab/:labId/api/zonas', apiAuth, requireAdmin, async (req, res) => {
+  try {
+    const zonas = await googleClient.obtenerZonasAdmin(req.params.labId);
+    res.json(zonas);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/lab/:labId/api/generar-qrs', apiAuth, requireAdmin, async (req, res) => {
+  try {
+    const { listaIds } = req.body;
+    const baseUrl = process.env.APP_BASE_URL || `http://${req.headers.host}/inventariolab`;
+    const result = await googleClient.ejecutarGeneracionQR(req.params.labId, baseUrl, listaIds);
+    res.json({ msg: result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Ruta principal de bienvenida / onboarding
+router.get('/', (req, res) => {
+  let saEmail = 'cuenta-de-servicio@...';
+  try {
+    const credsStr = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+    if (credsStr) {
+      const creds = JSON.parse(credsStr);
+      if (creds.client_email) saEmail = creds.client_email;
+    }
+  } catch (err) {
+    console.error('Error parseando JSON en ruta home');
+  }
+  res.render('home', { serviceAccountEmail: saEmail });
+});
+
+// Montar el router en el subpath definido
+app.use('/inventariolab', router);
+
+// Redirigir la raíz global al subpath
+app.get('/', (req, res) => res.redirect('/inventariolab'));
+
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor ejecutándose en puerto ${PORT}`);
+  console.log(`Subruta activa: /inventariolab`);
+});
