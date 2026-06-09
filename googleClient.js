@@ -210,10 +210,29 @@ async function subirFoto(sheetId, email, fila, base64Str, nombreArchivo) {
   const { sheets, drive } = getApis();
   if (!drive || !sheets) throw new Error("Google APIs no inicializadas");
 
-  // Buscar o crear la carpeta LAB_FOTOS en el Drive de la Service Account
+  // 1. Averiguar en qué carpeta está guardada la planilla
+  let parentId = null;
+  try {
+    const sheetFile = await drive.files.get({
+      fileId: sheetId,
+      fields: 'parents'
+    });
+    if (sheetFile.data.parents && sheetFile.data.parents.length > 0) {
+      parentId = sheetFile.data.parents[0];
+    }
+  } catch (err) {
+    console.log('No se pudo obtener el parentId de la planilla (puede estar en el root o falta permiso sobre la carpeta).', err.message);
+  }
+
+  // 2. Buscar o crear la carpeta LAB_FOTOS dentro de esa misma carpeta
   let folderId;
+  let q = "name = 'LAB_FOTOS' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
+  if (parentId) {
+    q += ` and '${parentId}' in parents`;
+  }
+
   const folderQuery = await drive.files.list({
-    q: "name = 'LAB_FOTOS' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+    q,
     fields: 'files(id)',
     spaces: 'drive',
   });
@@ -221,8 +240,11 @@ async function subirFoto(sheetId, email, fila, base64Str, nombreArchivo) {
   if (folderQuery.data.files && folderQuery.data.files.length > 0) {
     folderId = folderQuery.data.files[0].id;
   } else {
+    const requestBody = { name: 'LAB_FOTOS', mimeType: 'application/vnd.google-apps.folder' };
+    if (parentId) requestBody.parents = [parentId];
+
     const folderRes = await drive.files.create({
-      requestBody: { name: 'LAB_FOTOS', mimeType: 'application/vnd.google-apps.folder' },
+      requestBody,
       fields: 'id',
     });
     folderId = folderRes.data.id;
