@@ -80,16 +80,6 @@
       Inicia Sesión con Google
     </a>
 
-    <% if (mockEmail) { %>
-      <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 15px 0;">
-      <p style="font-size: 0.85rem; color: #7f8c8d;">Entorno de Desarrollo</p>
-      <form method="POST" action="/inventariolab/lab/<%= labId %>/login/mock">
-        <input type="hidden" name="redirect" value="<%= redirect %>">
-        <input type="hidden" name="email" value="<%= mockEmail %>">
-        <button type="submit" class="btn btn-mock">Acceder como <%= mockEmail %></button>
-      </form>
-    <% } %>
-
     <div class="footer-info">
       Debes ingresar con el correo autorizado en la configuración del laboratorio.
     </div>

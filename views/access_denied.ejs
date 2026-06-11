@@ -68,7 +68,11 @@
     <div class="footer-info">
       <% if (email) { %>
         Sesión activa: <span class="badge"><%= email %></span><br><br>
-        Pide al administrador que registre esta dirección en la hoja de configuración de <b><%= config.laboratorio %></b>.
+        Pide al administrador que registre esta dirección en la hoja de configuración de <b><%= config.laboratorio %></b>.<br><br>
+        <div style="background: #eef2ff; padding: 10px; border-radius: 8px; color: #3730a3; text-align: left; font-size: 0.85rem;">
+          <b>💡 ¿Eres el creador de este inventario?</b><br>
+          Para tener acceso, debes abrir tu planilla de Google, ir a la pestaña <b>config</b> y escribir tu propio correo (<%= email %>) en la columna Correo, asignándole el rol <b>ADMIN</b>.
+        </div>
       <% } else { %>
         Asegúrate de haber iniciado sesión con tu cuenta.
       <% } %>

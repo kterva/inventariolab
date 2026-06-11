@@ -78,11 +78,6 @@ async function getAppConfig(sheetId) {
 async function verificarPermisos(sheetId, email) {
   if (!email) return { autorizado: false, esAdmin: false };
   
-  // Bypass para entorno de desarrollo local sin credenciales reales
-  if (process.env.NODE_ENV === 'development' && email === process.env.MOCK_AUTH_EMAIL) {
-    return { autorizado: true, esAdmin: true };
-  }
-
   const { sheets } = getApis();
   if (!sheets) throw new Error("Google APIs no inicializadas");
 

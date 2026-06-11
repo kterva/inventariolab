@@ -73,24 +73,16 @@ router.use('/lab/:labId', async (req, res, next) => {
 // ─── RUTAS DE VISTAS ──────────────────────────────────
 
 router.get('/lab/:labId/login', (req, res) => {
-  const { labId } = req.params;
-  const redirect = req.query.redirect || `/inventariolab/lab/${labId}`;
-  res.render('login', { labId, redirect, config: req.appConfig, mockEmail: process.env.MOCK_AUTH_EMAIL });
-});
-
-router.post('/lab/:labId/login/mock', async (req, res) => {
-  if (process.env.NODE_ENV !== 'development' && !process.env.MOCK_AUTH_EMAIL) {
-    return res.status(403).send('Mock login deshabilitado');
+  // Si ya está logueado y autorizado, redirigir al dashboard
+  if (req.session.email) {
+    return res.redirect(`/inventariolab/lab/${req.params.labId}`);
   }
-  const { labId } = req.params;
-  const email = req.body.email || process.env.MOCK_AUTH_EMAIL;
   
-  // Guardamos sesión simple
-  req.session.email = email;
-  req.session.labId = labId;
-  
-  const redirect = req.body.redirect || `/inventariolab/lab/${labId}`;
-  res.redirect(redirect);
+  res.render('login', { 
+    labId: req.params.labId, 
+    config: req.appConfig,
+    redirect: req.query.redirect || `/inventariolab/lab/${req.params.labId}`
+  });
 });
 
 router.get('/lab/:labId/logout', (req, res) => {
