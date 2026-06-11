@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const googleClient = require('./googleClient');
 
 const app = express();
@@ -21,6 +23,27 @@ app.use(session({
   saveUninitialized: false,
   cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 1 día
 }));
+
+// Configurar Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((obj, done) => done(null, obj));
+
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_CLIENT_ID !== 'test') {
+  passport.use(new GoogleStrategy({
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: `${process.env.APP_BASE_URL || 'http://localhost:3000'}/inventariolab/auth/google/callback`,
+      passReqToCallback: true
+    },
+    function(req, accessToken, refreshToken, profile, cb) {
+      const email = profile.emails && profile.emails.length > 0 ? profile.emails[0].value : null;
+      return cb(null, { email });
+    }
+  ));
+}
 
 // Servir archivos estáticos si los hubiera
 app.use('/inventariolab/public', express.static(path.join(__dirname, 'public')));
@@ -122,19 +145,33 @@ router.get('/lab/:labId', async (req, res) => {
 });
 
 // ─── GOOGLE OAUTH CALLBACK ───────────────────────────
-// En una implementación real de OAuth2, usarías un paquete como passport-google-oauth20.
-// Para mantener simple la estructura base según el plan, se recomienda implementar
-// el callback nativo o usar Passport si se requiere.
-router.get('/auth/google', (req, res) => {
+
+router.get('/auth/google', (req, res, next) => {
+  if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID === 'test') {
+    return res.status(500).send('Google OAuth no está configurado (Falta el Client ID). Revisa tu .env');
+  }
   const labId = req.query.labId;
-  // TODO: Redirigir a URL de consentimiento de Google OAuth 2.0
-  res.send('Google OAuth no implementado por completo en la plantilla. Utiliza Mock Login.');
+  const redirect = req.query.redirect || `/inventariolab/lab/${labId}`;
+  
+  // Guardamos estado en la sesión temporalmente para saber a dónde volver
+  req.session.oauthState = { labId, redirect };
+  
+  passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
 });
 
-router.get('/auth/google/callback', (req, res) => {
-  // TODO: Recibir code, intercambiar por token, obtener perfil y setear req.session.email
-  res.send('Google OAuth Callback.');
-});
+router.get('/auth/google/callback', 
+  passport.authenticate('google', { failureRedirect: '/inventariolab' }),
+  (req, res) => {
+    // ¡Éxito!
+    const { labId, redirect } = req.session.oauthState || {};
+    req.session.email = req.user.email;
+    
+    if (labId) req.session.labId = labId;
+    delete req.session.oauthState;
+    
+    res.redirect(redirect || '/inventariolab');
+  }
+);
 
 
 // ─── API ENDPOINTS (Backend Auth) ─────────────────────
