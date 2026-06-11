@@ -266,7 +266,8 @@ router.get('/lab/:labId/api/zonas', apiAuth, requireAdmin, async (req, res) => {
 router.post('/lab/:labId/api/generar-qrs', apiAuth, requireAdmin, async (req, res) => {
   try {
     const { listaIds } = req.body;
-    const baseUrl = process.env.APP_BASE_URL || `http://${req.headers.host}/inventariolab`;
+    let baseUrl = process.env.APP_BASE_URL || `http://${req.headers.host}`;
+    if (!baseUrl.endsWith('/inventariolab')) baseUrl += '/inventariolab';
     const result = await googleClient.ejecutarGeneracionQR(req.params.labId, baseUrl, listaIds);
     res.json({ msg: result });
   } catch (err) {
