@@ -7,6 +7,7 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const googleClient = require('./googleClient');
 
 const app = express();
+app.set('trust proxy', 1); // Confiar en el proxy de Nginx
 const PORT = process.env.PORT || 3000;
 
 // Configurar EJS
@@ -160,16 +161,22 @@ router.get('/auth/google', (req, res, next) => {
 });
 
 router.get('/auth/google/callback', 
-  passport.authenticate('google', { failureRedirect: '/inventariolab' }),
+  passport.authenticate('google', { failureRedirect: '/inventariolab?error=oauth_failed' }),
   (req, res) => {
     // ¡Éxito!
+    console.log("OAuth Success! Session ID:", req.sessionID);
+    console.log("OAuth State:", req.session.oauthState);
+    console.log("User Email:", req.user?.email);
+
     const { labId, redirect } = req.session.oauthState || {};
     req.session.email = req.user.email;
     
     if (labId) req.session.labId = labId;
     delete req.session.oauthState;
     
-    res.redirect(redirect || '/inventariolab');
+    const finalRedirect = redirect || `/inventariolab/lab/${labId || 'default'}`;
+    console.log("Redirecting to:", finalRedirect);
+    res.redirect(finalRedirect);
   }
 );
 
