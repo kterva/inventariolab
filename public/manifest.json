@@ -1,0 +1,16 @@
+{
+  "name": "InventarioLab",
+  "short_name": "Inventario",
+  "start_url": "/inventariolab",
+  "display": "standalone",
+  "background_color": "#f2f4f7",
+  "theme_color": "#1a5276",
+  "icons": [
+    {
+      "src": "/inventariolab/public/app_icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
