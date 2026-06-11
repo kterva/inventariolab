@@ -71,7 +71,7 @@
 
   <div id="que-es" class="section">
     <h2>💡 1. ¿Qué es InventarioLab?</h2>
-    <p><b>InventarioLab</b> es un sistema web gratuito y de código abierto diseñado para conectar los armarios físicos de un laboratorio escolar con una simple planilla de Excel (Google Sheets).</p>
+    <p><b>InventarioLab</b> es un sistema web gratuito y de código abierto diseñado para conectar los armarios físicos de laboratorios de educación media con una simple planilla de Excel (Google Sheets).</p>
     <p>Permite a los docentes buscar materiales rápidamente desde su celular, escanear Códigos QR pegados en las puertas de los armarios para ver su contenido al instante (¡con fotos!), y controlar el estado del material (sano, regular, roto).</p>
   </div>
 
@@ -82,13 +82,13 @@
     <div class="step">
       <div class="step-number">1</div>
       <div class="step-content">
-        <b>Crear la Carpeta:</b> Ve a tu Google Drive y crea una carpeta nueva (Ej: <i>"Inventario de Física"</i>).
+        <b>Crear la Carpeta:</b> Ve a tu Google Drive y crea una carpeta nueva (Ej: <i>"Inventario de Física"</i>). <b>¿Para qué?</b> Esta carpeta actuará como el "disco duro" exclusivo de tu laboratorio, donde se guardarán de forma organizada las fotos de todos tus materiales para no mezclarse con tus archivos personales.
       </div>
     </div>
     <div class="step">
       <div class="step-number">2</div>
       <div class="step-content">
-        <b>Compartir con el Servidor:</b> Haz clic derecho en la carpeta, dale a <i>Compartir</i>, y compártela como <b>Editor</b> con el correo de servicio oficial que aparece en la pantalla principal de la aplicación.
+        <b>Compartir con el Servidor:</b> Haz clic derecho en la carpeta, dale a <i>Compartir</i>, y compártela como <b>Editor</b> con el correo de servicio oficial que aparece en la pantalla principal. <br><b>¿Qué es este correo y por qué compartirlo?</b> Es un "robot" automatizado alojado en un servidor seguro. Al compartirle la carpeta, le das permiso ÚNICAMENTE para guardar allí adentro las fotos de tu inventario. El sistema no puede leer ni acceder a nada más de tu Google Drive personal. ¡Tus datos están seguros!
       </div>
     </div>
     <div class="step">
@@ -100,7 +100,7 @@
     <div class="step">
       <div class="step-number">4</div>
       <div class="step-content">
-        <b>Mover y Configurar:</b> Ve a tu Google Drive, mueve la planilla recién copiada hacia <b>adentro</b> de la carpeta que creaste. Luego ábrela, ve a la pestaña inferior que dice <code>config</code>, y en la columna de correos pon <b>tu propio correo de Gmail</b>.
+        <b>Mover y Configurar:</b> Ve a tu Google Drive, mueve la planilla recién copiada hacia <b>adentro</b> de la carpeta que creaste (esto garantiza que las fotos del inventario se guarden organizadas junto a tu planilla). Luego ábrela, ve a la pestaña inferior que dice <code>config</code>, y en la columna de correos pon <b>tu propio correo</b>.
       </div>
     </div>
     
@@ -110,8 +110,8 @@
   </div>
 
   <div id="usuarios" class="section">
-    <h2>👥 3. Gestión de Profesores (Usuarios)</h2>
-    <p>El sistema requiere que cada persona inicie sesión con su cuenta de Google. Para decidir quién entra y quién no, debes editar la pestaña <code>config</code> en tu Google Sheet.</p>
+    <h2>👥 3. Gestión de Usuarios</h2>
+    <p>El sistema requiere que cada persona inicie sesión con su cuenta. Puedes usar cualquier correo <b>@gmail.com</b> o cuentas institucionales de Google Workspace (por ejemplo, cuentas <b>@docente.ceibal.edu.uy</b>). Para decidir quién entra y quién no, debes editar la pestaña <code>config</code> en tu planilla.</p>
     
     <table>
       <tr>
@@ -134,7 +134,10 @@
 
   <div id="excel" class="section">
     <h2>📊 4. El Inventario (Google Sheets)</h2>
-    <p>La base de datos central es la pestaña <code>BD</code> de tu planilla. Aquí es donde agregas todo tu material físico.</p>
+    <div class="alert" style="background: #f8d7da; color: #721c24; border-color: #f5c6cb;">
+      <b>¡ATENCIÓN!</b> Nunca cambies el nombre de las columnas ni su orden en la planilla. Si lo haces, la aplicación web fallará al intentar leer tus datos.
+    </div>
+    <p>La base de datos central es la pestaña <code>INVENTARIO</code> de tu planilla. Aquí es donde agregas todo tu material físico.</p>
     
     <h3>Columnas Obligatorias</h3>
     <ul>
