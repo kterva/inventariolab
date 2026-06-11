@@ -57,6 +57,11 @@ app.use('/inventariolab/public', express.static(path.join(__dirname, 'public')))
 // Router para el subpath
 const router = express.Router();
 
+// Ruta explícita para el icono, evitando que Nginx lo intercepte como archivo estático
+router.get('/public/app_icon', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'app_icon.png'));
+});
+
 // Middleware de inyección de configuración
 router.use('/lab/:labId', async (req, res, next) => {
   if (req.path.includes('/api/')) return next();
