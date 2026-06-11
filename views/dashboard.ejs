@@ -38,7 +38,7 @@
   <div id="nav-title"><%= config.laboratorio %> - <%= esAdmin ? "Dashboard" : "Buscador" %></div>
   <div style="display: flex; align-items: center;">
     <% if (esAdmin) { %>
-      <button onclick="showView('home')" style="width:auto; margin:0; padding:5px 15px;">Inicio</button>
+      <button onclick="volverInicio()" style="width:auto; margin:0; padding:5px 15px;">Inicio</button>
     <% } %>
     <a href="/inventariolab/ayuda" class="logout-btn" style="background: rgba(255,255,255,0.1); border-color: transparent;">Ayuda</a>
     <a href="/inventariolab/lab/<%= labId %>/logout" class="logout-btn">Salir</a>
@@ -65,7 +65,7 @@
   </div>
 
   <div id="view-search" class="hidden">
-    <button onclick="showView('home')">← Volver</button>
+    <button onclick="history.back()">← Volver</button>
     <h2>Buscador de Artículos</h2>
     <div class="search-box">
       <input type="text" id="searchInput" placeholder="Ej: Lupa, Multímetro..." onkeypress="if(event.key === 'Enter') doSearch()">
@@ -75,13 +75,13 @@
   </div>
 
   <div id="view-explore" class="hidden">
-    <button onclick="showView('home')">← Volver</button>
+    <button onclick="history.back()">← Volver</button>
     <h2>Seleccionar Ubicación</h2>
     <div id="exploreList"></div>
   </div>
 
 <div id="view-zones" class="hidden">
-    <button onclick="showView('home')">← Volver</button>
+    <button onclick="history.back()">← Volver</button>
     <h2>1. Impresión de Códigos QR</h2>
     
     <div style="background: #e8f4f8; padding: 10px; border-radius: 4px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #bce0ee;">
@@ -145,32 +145,59 @@
     if (overlay) overlay.remove();
   });
 
-  // Prevención de salida accidental (Presionar Atrás 2 veces para salir)
+  // SPA Routing y Prevención de salida
   let backPressedOnce = false;
-  history.pushState({ noExit: true }, '', window.location.href);
+
+  // Ancla base: estado "root"
+  history.replaceState({ root: true }, '', window.location.href);
+  // Estado real inicial del usuario (vista home)
+  history.pushState({ view: 'home' }, '', window.location.href);
 
   window.addEventListener('popstate', function(event) {
-    if (!backPressedOnce) {
-      backPressedOnce = true;
-      history.pushState({ noExit: true }, '', window.location.href);
-      
-      // Crear y mostrar Toast
-      const toast = document.createElement('div');
-      toast.textContent = 'Presiona Atrás nuevamente para salir';
-      toast.style.cssText = 'position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:white;padding:12px 24px;border-radius:24px;font-size:0.9rem;z-index:10000;pointer-events:none;transition:opacity 0.3s;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
-      document.body.appendChild(toast);
-      
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 300);
-        backPressedOnce = false;
-      }, 2000);
-    } else {
-      history.back(); // Salir definitivamente
+    const state = event.state;
+    
+    // Si caímos en el "root", el usuario intentó salir del home
+    if (state && state.root) {
+      if (!backPressedOnce) {
+        backPressedOnce = true;
+        // Rebotar hacia adelante para atraparlo
+        history.pushState({ view: 'home' }, '', window.location.href);
+        
+        const toast = document.createElement('div');
+        toast.textContent = 'Presiona Atrás nuevamente para salir';
+        toast.style.cssText = 'position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:white;padding:12px 24px;border-radius:24px;font-size:0.9rem;z-index:10000;pointer-events:none;transition:opacity 0.3s;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          setTimeout(() => toast.remove(), 300);
+          backPressedOnce = false;
+        }, 2000);
+      } else {
+        history.back(); // Salir definitivamente
+      }
+    } 
+    // Si cayó en una vista válida del historial
+    else if (state && state.view) {
+      mostrarVistaInterna(state.view);
+      backPressedOnce = false;
     }
   });
 
   function showView(viewId) {
+    // Evitar pushear el mismo estado si ya estamos en esa vista
+    history.pushState({ view: viewId }, '', window.location.href);
+    mostrarVistaInterna(viewId);
+    backPressedOnce = false;
+  }
+
+  function volverInicio() {
+    // Para el botón de la barra superior. Solo vuelve al inicio si no estamos ya allí.
+    mostrarVistaInterna('home');
+    history.pushState({ view: 'home' }, '', window.location.href);
+  }
+
+  function mostrarVistaInterna(viewId) {
     ['home', 'search', 'explore', 'zones'].forEach(v => document.getElementById('view-' + v).classList.add('hidden'));
     document.getElementById('view-' + viewId).classList.remove('hidden');
     if(viewId === 'search') document.getElementById('searchInput').focus();
