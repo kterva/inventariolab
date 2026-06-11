@@ -87,5 +87,13 @@
       Debes ingresar con el correo autorizado en la configuración del laboratorio.
     </div>
   </div>
+  <script>
+    // Registrar Service Worker para la PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/inventariolab/sw.js').catch(err => console.log('SW Falló', err));
+      });
+    }
+  </script>
 </body>
 </html>

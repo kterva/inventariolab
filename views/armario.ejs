@@ -387,6 +387,17 @@ async function enviar(btn) {
 function abrirSelector(fila) { document.getElementById("finput" + fila).click(); }
 
 // --- ARRANQUE CON FOCO DE BÚSQUEDA ---
+window.abrirConCarga = function(url) {
+  window.location.href = url;
+}
+
+// Registrar Service Worker para la PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/inventariolab/sw.js').catch(err => console.log('SW Falló', err));
+  });
+}
+
 window.onload = function() {
   let hash = window.location.hash || ""; 
   if (hash.includes("item-")) {

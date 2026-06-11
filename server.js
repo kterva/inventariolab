@@ -57,9 +57,17 @@ app.use('/inventariolab/public', express.static(path.join(__dirname, 'public')))
 // Router para el subpath
 const router = express.Router();
 
-// Ruta explícita para el icono, evitando que Nginx lo intercepte como archivo estático
+// Rutas explícitas para PWA (evita problemas de Nginx y asegura MIME types correctos)
 router.get('/public/app_icon', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'app_icon.png'));
+});
+router.get('/public/manifest.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json');
+  res.sendFile(path.join(__dirname, 'public', 'manifest.json'));
+});
+router.get('/sw.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.sendFile(path.join(__dirname, 'public', 'sw.js'));
 });
 
 // Middleware de inyección de configuración

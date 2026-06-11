@@ -339,6 +339,12 @@
     checkboxes.forEach(cb => cb.checked = source);
   }
 
+  // Registrar Service Worker para la PWA
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/inventariolab/sw.js').catch(err => console.log('SW Falló', err));
+    });
+  }
 </script>
 
 <footer style="text-align:center; padding:1.5rem 1rem 2rem; color:#94a3b8; font-size:0.75rem; border-top:1px solid #e2e8f0; margin-top:2rem;">

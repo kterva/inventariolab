@@ -212,6 +212,13 @@
       // Redirigir al laboratorio correspondiente
       window.location.href = "/inventariolab/lab/" + finalId;
     }
+    
+    // Registrar Service Worker para la PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/inventariolab/sw.js').catch(err => console.log('SW Falló', err));
+      });
+    }
   </script>
 </body>
 </html>
