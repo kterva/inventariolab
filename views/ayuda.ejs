@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap">
+  <title>Ayuda y Manual de Usuario - InventarioLab</title>
+  <style>
+    :root { --primary: #1a5276; --secondary: #2980b9; --bg: #f4f7f6; --text: #333; }
+    body { font-family: 'Roboto', sans-serif; margin: 0; background: var(--bg); color: var(--text); line-height: 1.6; }
+    nav { background: var(--primary); color: white; padding: 1rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100;}
+    .nav-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); padding: 5px 15px; border-radius: 4px; color: white; text-decoration: none; font-size: 0.9rem; font-weight: bold;}
+    .nav-btn:hover { background: rgba(255,255,255,0.3); }
+    
+    .container { max-width: 800px; margin: 2rem auto; padding: 0 1.5rem; }
+    
+    .header-box { text-align: center; margin-bottom: 2rem; }
+    .header-box h1 { color: var(--primary); margin-bottom: 0.5rem; }
+    .header-box p { color: #7f8c8d; font-size: 1.1rem; }
+    
+    .toc { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 2rem; border-left: 4px solid var(--secondary); }
+    .toc h3 { margin-top: 0; color: var(--primary); }
+    .toc ul { list-style: none; padding-left: 0; margin: 0; }
+    .toc li { margin-bottom: 0.5rem; }
+    .toc a { color: var(--secondary); text-decoration: none; font-weight: bold; }
+    .toc a:hover { text-decoration: underline; }
+    
+    .section { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 2rem; scroll-margin-top: 80px; }
+    .section h2 { color: var(--primary); border-bottom: 2px solid #ecf0f1; padding-bottom: 0.5rem; margin-top: 0; display: flex; align-items: center; gap: 10px;}
+    .section h3 { color: var(--secondary); margin-top: 1.5rem; }
+    
+    .step { display: flex; margin-bottom: 1rem; }
+    .step-number { background: var(--secondary); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; margin-right: 15px; margin-top: 3px;}
+    .step-content { flex-grow: 1; }
+    
+    .alert { background: #fff3cd; color: #856404; padding: 1rem; border-left: 4px solid #ffeeba; border-radius: 4px; margin: 1rem 0; font-size: 0.95rem; }
+    .info { background: #e8f4f8; color: #1a5276; padding: 1rem; border-left: 4px solid #bce0ee; border-radius: 4px; margin: 1rem 0; font-size: 0.95rem; }
+    
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+    th { background-color: #f8f9fa; color: var(--primary); }
+    
+    code { background: #f1f2f6; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #e74c3c; font-size: 0.95em;}
+    
+    footer { text-align: center; padding: 2rem; color: #95a5a6; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div style="font-weight: bold; font-size: 1.2rem;">📖 Ayuda InventarioLab</div>
+  <a href="javascript:history.back()" class="nav-btn">← Volver</a>
+</nav>
+
+<div class="container">
+  <div class="header-box">
+    <h1>Manual de Usuario</h1>
+    <p>Todo lo que necesitas saber para instalar, configurar y usar tu laboratorio.</p>
+  </div>
+
+  <div class="toc">
+    <h3>Índice Rápido</h3>
+    <ul>
+      <li><a href="#que-es">1. ¿Qué es InventarioLab?</a></li>
+      <li><a href="#instalacion">2. Primeros Pasos (Instalación)</a></li>
+      <li><a href="#usuarios">3. Gestión de Profesores (Usuarios)</a></li>
+      <li><a href="#excel">4. El Inventario (Google Sheets)</a></li>
+      <li><a href="#zonas">5. Armarios y Códigos QR</a></li>
+      <li><a href="#uso">6. Uso Diario (Búsqueda y Escaneo)</a></li>
+    </ul>
+  </div>
+
+  <div id="que-es" class="section">
+    <h2>💡 1. ¿Qué es InventarioLab?</h2>
+    <p><b>InventarioLab</b> es un sistema web gratuito y de código abierto diseñado para conectar los armarios físicos de un laboratorio escolar con una simple planilla de Excel (Google Sheets).</p>
+    <p>Permite a los docentes buscar materiales rápidamente desde su celular, escanear Códigos QR pegados en las puertas de los armarios para ver su contenido al instante (¡con fotos!), y controlar el estado del material (sano, regular, roto).</p>
+  </div>
+
+  <div id="instalacion" class="section">
+    <h2>🚀 2. Primeros Pasos (Instalación)</h2>
+    <p>Para crear tu propio InventarioLab privado, no necesitas saber programar. Sigue estos pasos:</p>
+    
+    <div class="step">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <b>Crear la Carpeta:</b> Ve a tu Google Drive y crea una carpeta nueva (Ej: <i>"Inventario de Física"</i>).
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <b>Compartir con el Servidor:</b> Haz clic derecho en la carpeta, dale a <i>Compartir</i>, y compártela como <b>Editor</b> con el correo de servicio oficial que aparece en la pantalla principal de la aplicación.
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-number">3</div>
+      <div class="step-content">
+        <b>Copiar la Planilla:</b> Haz clic en el enlace "Crear una copia de la Planilla Modelo" desde la pantalla principal.
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-number">4</div>
+      <div class="step-content">
+        <b>Mover y Configurar:</b> Ve a tu Google Drive, mueve la planilla recién copiada hacia <b>adentro</b> de la carpeta que creaste. Luego ábrela, ve a la pestaña inferior que dice <code>config</code>, y en la columna de correos pon <b>tu propio correo de Gmail</b>.
+      </div>
+    </div>
+    
+    <div class="alert">
+      <b>¡Listo!</b> Ahora solo copia el enlace (URL) de esa planilla y pégalo en la pantalla principal de InventarioLab para generar tu link mágico de acceso.
+    </div>
+  </div>
+
+  <div id="usuarios" class="section">
+    <h2>👥 3. Gestión de Profesores (Usuarios)</h2>
+    <p>El sistema requiere que cada persona inicie sesión con su cuenta de Google. Para decidir quién entra y quién no, debes editar la pestaña <code>config</code> en tu Google Sheet.</p>
+    
+    <table>
+      <tr>
+        <th>Rol</th>
+        <th>Qué puede hacer</th>
+      </tr>
+      <tr>
+        <td><b>ADMIN</b></td>
+        <td>Tiene control total. Puede ver el botón de Inicio, explorar todos los armarios, agregar nuevas zonas y mandar a generar los Códigos QR para imprimir.</td>
+      </tr>
+      <tr>
+        <td><b>USER</b></td>
+        <td>Uso diario. Solo ve el buscador general para encontrar materiales, y puede escanear los Códigos QR con su celular para ver qué hay adentro de un armario.</td>
+      </tr>
+    </table>
+    <div class="info">
+      Si alguien intenta entrar y su correo no está en la pestaña <code>config</code>, el sistema bloqueará su acceso por seguridad.
+    </div>
+  </div>
+
+  <div id="excel" class="section">
+    <h2>📊 4. El Inventario (Google Sheets)</h2>
+    <p>La base de datos central es la pestaña <code>BD</code> de tu planilla. Aquí es donde agregas todo tu material físico.</p>
+    
+    <h3>Columnas Obligatorias</h3>
+    <ul>
+      <li><b>Artículo:</b> El nombre del material (Ej: <i>Multímetro Digital</i>).</li>
+      <li><b>Cantidad Total:</b> Cuántos hay en total (Ej: <i>5</i>).</li>
+      <li><b>Estado (✅, ⚠️, ❌):</b> Reparte la cantidad total entre "Sano", "Regular" y "Roto". Si tienes 5 y 1 está roto, pon 4 en la columna ✅ y 1 en la ❌.</li>
+    </ul>
+
+    <h3>Columnas Opcionales</h3>
+    <ul>
+      <li><b>Ubicación:</b> Escribe exactamente el nombre del armario donde está guardado (Ej: <i>Armario Sur 1</i>). Debe coincidir con las Zonas creadas.</li>
+      <li><b>Link a Imagen:</b> Pega una URL de una imagen de internet, o aún mejor, un enlace a una imagen guardada en tu misma carpeta compartida de Google Drive. El sistema la mostrará en miniatura.</li>
+    </ul>
+  </div>
+
+  <div id="zonas" class="section">
+    <h2>🏷️ 5. Armarios y Códigos QR</h2>
+    <p>Para que la magia del escáner funcione, primero debes crear las ubicaciones físicas en el sistema.</p>
+    
+    <ol>
+      <li>Ingresa como <b>ADMIN</b> y haz clic en <i>Impresión de QRs y Gestión de Zonas</i>.</li>
+      <li>En la parte inferior, crea una <b>Nueva Zona</b>. El nombre debe ser corto y claro (Ej: <i>Estante Vidriería</i>).</li>
+      <li>Este nombre es el que debes usar en la columna "Ubicación" de tu planilla Excel para meter los materiales "adentro" de este estante virtual.</li>
+      <li>Arriba, selecciona tus zonas y presiona <b>🖨️ Imprimir Seleccionados</b>.</li>
+    </ol>
+
+    <div class="info">
+      Cuando generas un código QR, el sistema inyecta la imagen automáticamente en la pestaña <code>IMPRIMIR_QR</code> de tu Google Sheet. Solo tienes que ir allí, darle a "Imprimir", recortarlo con tijera y pegarlo en la puerta física del estante en el laboratorio.
+    </div>
+  </div>
+
+  <div id="uso" class="section">
+    <h2>📱 6. Uso Diario</h2>
+    
+    <h3>Búsqueda Manual</h3>
+    <p>Cualquier profesor puede usar el <b>Buscador Global</b>. Solo escribe una palabra clave (Ej: <i>"Lupa"</i>) y el sistema te dirá instantáneamente si hay stock, si están rotos, y en qué armario buscar.</p>
+
+    <h3>Escaneo de QR (Modo Armario)</h3>
+    <p>Cuando un docente abre un armario, solo tiene que abrir la cámara de su celular y apuntar al Código QR pegado en la puerta.</p>
+    <p>Esto abrirá el sistema InventarioLab directamente en la sección de ese armario específico, mostrando la foto y la lista de todo lo que <b>debería estar</b> allí adentro. ¡Ideal para revisar que los alumnos hayan guardado todo en su lugar al finalizar la clase!</p>
+  </div>
+
+</div>
+
+<footer>
+  Sistema InventarioLab - Proyecto de Software Libre para la Educación.
+</footer>
+
+</body>
+</html>

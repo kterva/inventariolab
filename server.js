@@ -142,6 +142,26 @@ router.get('/lab/:labId', async (req, res) => {
   });
 });
 
+// ─── RUTAS GLOBALES (SIN LABID) ────────────────────────
+
+router.get('/', (req, res) => {
+  let saEmail = 'cuenta-de-servicio@...';
+  try {
+    const credsStr = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+    if (credsStr) {
+      const creds = JSON.parse(credsStr);
+      if (creds.client_email) saEmail = creds.client_email;
+    }
+  } catch (err) {
+    console.error('Error parseando JSON en ruta home');
+  }
+  res.render('home', { serviceAccountEmail: saEmail });
+});
+
+router.get('/ayuda', (req, res) => {
+  res.render('ayuda');
+});
+
 // ─── GOOGLE OAUTH CALLBACK ───────────────────────────
 
 router.get('/auth/google', (req, res, next) => {
