@@ -72,7 +72,6 @@ router.get('/sw.js', (req, res) => {
 
 // Middleware de inyección de configuración
 router.use('/lab/:labId', async (req, res, next) => {
-  if (req.path.includes('/api/')) return next();
   try {
     const config = await googleClient.getAppConfig(req.params.labId);
     req.appConfig = config;
