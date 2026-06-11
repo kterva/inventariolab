@@ -1,6 +1,7 @@
 {
   "name": "InventarioLab",
   "short_name": "Inventario",
+  "description": "Gestor de inventario para laboratorios de educación media.",
   "start_url": "/inventariolab",
   "display": "standalone",
   "background_color": "#f2f4f7",
