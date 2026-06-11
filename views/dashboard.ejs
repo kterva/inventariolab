@@ -145,6 +145,31 @@
     if (overlay) overlay.remove();
   });
 
+  // Prevención de salida accidental (Presionar Atrás 2 veces para salir)
+  let backPressedOnce = false;
+  history.pushState({ noExit: true }, '', window.location.href);
+
+  window.addEventListener('popstate', function(event) {
+    if (!backPressedOnce) {
+      backPressedOnce = true;
+      history.pushState({ noExit: true }, '', window.location.href);
+      
+      // Crear y mostrar Toast
+      const toast = document.createElement('div');
+      toast.textContent = 'Presiona Atrás nuevamente para salir';
+      toast.style.cssText = 'position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:white;padding:12px 24px;border-radius:24px;font-size:0.9rem;z-index:10000;pointer-events:none;transition:opacity 0.3s;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+        backPressedOnce = false;
+      }, 2000);
+    } else {
+      history.back(); // Salir definitivamente
+    }
+  });
+
   function showView(viewId) {
     ['home', 'search', 'explore', 'zones'].forEach(v => document.getElementById('view-' + v).classList.add('hidden'));
     document.getElementById('view-' + viewId).classList.remove('hidden');
