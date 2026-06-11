@@ -20,13 +20,13 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Configuración de Sesiones
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'secret',
-  resave: true,
-  saveUninitialized: true,
+  secret: process.env.SESSION_SECRET || 'inventariolab-secret',
+  resave: false,
+  saveUninitialized: false,
   cookie: { 
     secure: false, 
     sameSite: 'lax',
-    maxAge: 24 * 60 * 60 * 1000 
+    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 días
   }
 }));
 
