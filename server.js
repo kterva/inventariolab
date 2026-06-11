@@ -24,7 +24,8 @@ app.use(session({
   resave: true,
   saveUninitialized: true,
   cookie: { 
-    secure: false, // Debe ser false porque Nginx no está enviando X-Forwarded-Proto
+    secure: false, 
+    sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000 
   }
 }));
@@ -158,31 +159,36 @@ router.get('/auth/google', (req, res, next) => {
   const labId = req.query.labId;
   const redirect = req.query.redirect || `/inventariolab/lab/${labId}`;
   
-  // Guardamos estado en la sesión y forzamos el guardado antes de redirigir
-  req.session.oauthState = { labId, redirect };
-  req.session.save((err) => {
-    if (err) console.error("Error guardando sesion:", err);
-    passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
-  });
+  // Guardamos estado en un Base64 (A prueba de fallos de sesión)
+  const stateStr = Buffer.from(JSON.stringify({ labId, redirect })).toString('base64');
+  
+  passport.authenticate('google', { scope: ['profile', 'email'], state: stateStr })(req, res, next);
 });
 
 router.get('/auth/google/callback', 
   passport.authenticate('google', { failureRedirect: '/inventariolab?error=oauth_failed' }),
   (req, res) => {
-    // ¡Éxito!
-    console.log("OAuth Success! Session ID:", req.sessionID);
-    console.log("OAuth State:", req.session.oauthState);
-    console.log("User Email:", req.user?.email);
+    // Recuperar estado desde la URL
+    let stateObj = {};
+    if (req.query.state) {
+      try {
+        stateObj = JSON.parse(Buffer.from(req.query.state, 'base64').toString('utf8'));
+      } catch(e) { console.error("Error parsing state", e); }
+    }
+    
+    const { labId, redirect } = stateObj;
+    console.log("OAuth Success! Email:", req.user?.email, "LabID:", labId);
 
-    const { labId, redirect } = req.session.oauthState || {};
+    // Setear credenciales en la sesión
     req.session.email = req.user.email;
-    
     if (labId) req.session.labId = labId;
-    delete req.session.oauthState;
     
-    const finalRedirect = redirect || `/inventariolab/lab/${labId || 'default'}`;
-    console.log("Redirecting to:", finalRedirect);
-    res.redirect(finalRedirect);
+    // Forzar guardado de la cookie ANTES de redirigir
+    req.session.save((err) => {
+      if (err) console.error("Error guardando sesion final:", err);
+      const finalRedirect = redirect || `/inventariolab/lab/${labId || 'default'}`;
+      res.redirect(finalRedirect);
+    });
   }
 );
 
