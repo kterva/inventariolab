@@ -18,11 +18,15 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Configuración de Sesiones
 app.use(session({
   secret: process.env.SESSION_SECRET || 'secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 1 día
+  resave: true,
+  saveUninitialized: true,
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production', // Nginx proxy SSL
+    maxAge: 24 * 60 * 60 * 1000 
+  }
 }));
 
 // Configurar Passport
@@ -154,10 +158,12 @@ router.get('/auth/google', (req, res, next) => {
   const labId = req.query.labId;
   const redirect = req.query.redirect || `/inventariolab/lab/${labId}`;
   
-  // Guardamos estado en la sesión temporalmente para saber a dónde volver
+  // Guardamos estado en la sesión y forzamos el guardado antes de redirigir
   req.session.oauthState = { labId, redirect };
-  
-  passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+  req.session.save((err) => {
+    if (err) console.error("Error guardando sesion:", err);
+    passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+  });
 });
 
 router.get('/auth/google/callback', 
