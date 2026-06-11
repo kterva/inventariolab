@@ -24,7 +24,7 @@ app.use(session({
   resave: true,
   saveUninitialized: true,
   cookie: { 
-    secure: process.env.NODE_ENV === 'production', // Nginx proxy SSL
+    secure: false, // Debe ser false porque Nginx no está enviando X-Forwarded-Proto
     maxAge: 24 * 60 * 60 * 1000 
   }
 }));
