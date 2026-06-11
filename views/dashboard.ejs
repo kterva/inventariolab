@@ -114,32 +114,25 @@
   });
 
   function abrirConCarga(url) {
-    const w = window.open('', '_blank');
-    if (!w) { window.open(url, '_blank'); return; }
-    const urlJson = JSON.stringify(url);
-    w.document.write(
-      '<!DOCTYPE html><html>' +
-      '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cargando...</title>' +
-      '<style>' +
-      '*{box-sizing:border-box;margin:0;padding:0}' +
-      'body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f2f4f7}' +
-      '.card{text-align:center;padding:2.5rem 2rem;background:#fff;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.08);max-width:320px;width:90%}' +
-      '.ico{font-size:3rem;margin-bottom:1rem;display:block}' +
-      'h2{font-size:1.1rem;font-weight:600;color:#1a5276;margin:0 0 .4rem}' +
-      'p{color:#94a3b8;font-size:.85rem;margin:0}' +
-      '.sp{width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#1a5276;border-radius:50%;animation:spin .75s linear infinite;margin:1.5rem auto 0}' +
-      '@keyframes spin{to{transform:rotate(360deg)}}' +
-      '</style>' +
-      '<script>window.onload=function(){location.replace(' + urlJson + ')}<\/script>' +
-      '</head>' +
-      '<body><div class="card">' +
-      '<span class="ico">📦</span>' +
-      '<h2>Cargando inventario...</h2>' +
-      '<p>Consultando la base de datos</p>' +
-      '<div class="sp"></div>' +
-      '</div></body></html>'
-    );
-    w.document.close();
+    // En móviles, abrir about:blank y escribir HTML rompe la escala visual.
+    // Es mejor mostrar un overlay de carga a pantalla completa en la ventana actual.
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#f2f4f7;z-index:9999;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;text-align:center;flex-direction:column;';
+    overlay.innerHTML = `
+      <div style="background:#fff;padding:2.5rem 2rem;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.08);max-width:320px;width:90%;">
+        <span style="font-size:3rem;margin-bottom:1rem;display:block;">📦</span>
+        <h2 style="font-size:1.1rem;font-weight:600;color:#1a5276;margin:0 0 .4rem;">Cargando inventario...</h2>
+        <p style="color:#94a3b8;font-size:.85rem;margin:0;">Consultando la base de datos</p>
+        <div style="width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#1a5276;border-radius:50%;margin:1.5rem auto 0;animation:spin .75s linear infinite;"></div>
+      </div>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+    `;
+    document.body.appendChild(overlay);
+    
+    // Pequeño delay visual antes de redireccionar
+    setTimeout(() => {
+      window.location.href = url;
+    }, 100);
   }
 
   function showView(viewId) {
