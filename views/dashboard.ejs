@@ -34,6 +34,10 @@
 </head>
 <body>
 
+<% if (typeof config !== 'undefined' && config.isDemo === 'SI') { %>
+  <div style="position:fixed;top:30px;right:-40px;background:#e74c3c;color:white;padding:5px 40px;transform:rotate(45deg);font-weight:bold;z-index:99999;pointer-events:none;box-shadow:0 2px 4px rgba(0,0,0,0.2); letter-spacing: 1px;">MODO DEMO</div>
+<% } %>
+
 <nav>
   <div id="nav-title"><%= config.laboratorio %> - <%= esAdmin ? "Dashboard" : "Buscador" %></div>
   <div style="display: flex; align-items: center;">

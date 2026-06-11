@@ -44,7 +44,9 @@ async function getAppConfig(sheetId) {
   const config = {
     institucion: "Liceo Sauce 2",
     laboratorio: "Laboratorio de Física",
-    accesoPublico: "SI"
+    accesoPublico: "SI",
+    isDemo: "NO",
+    demoRol: "LECTOR"
   };
 
   try {
@@ -65,6 +67,10 @@ async function getAppConfig(sheetId) {
           if (valor) config.laboratorio = valor;
         } else if (clave === 'accesopublico' || clave === 'acceso publico') {
           if (valor) config.accesoPublico = valor.toUpperCase();
+        } else if (clave === 'mododemo' || clave === 'modo demo') {
+          if (valor) config.isDemo = valor.toUpperCase();
+        } else if (clave === 'demorol' || clave === 'demo rol') {
+          if (valor) config.demoRol = valor.toUpperCase();
         }
       }
     }
@@ -76,6 +82,8 @@ async function getAppConfig(sheetId) {
 
 /** Verifica si el email está en la columna A de 'config' y retorna el rol de la columna B */
 async function verificarPermisos(sheetId, email) {
+  // Las llamadas a verificarPermisos en el demo se bypassan en server.js, 
+  // pero por si acaso, dejamos esta función intacta porque necesita sheetId.
   if (!email) return { autorizado: false, esAdmin: false };
   
   const { sheets } = getApis();

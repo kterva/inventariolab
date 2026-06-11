@@ -76,6 +76,13 @@ router.use('/lab/:labId', async (req, res, next) => {
   try {
     const config = await googleClient.getAppConfig(req.params.labId);
     req.appConfig = config;
+    
+    // Auto-login silencioso para el MODO DEMO
+    if (config.isDemo === 'SI') {
+      req.session.email = 'invitado@demo.com';
+      req.session.labId = req.params.labId;
+    }
+    
     next();
   } catch (err) {
     console.error('Error al obtener config:', err);
@@ -114,9 +121,14 @@ router.get('/lab/:labId', async (req, res) => {
     let esAdmin = false;
 
     if (email && req.session.labId === labId) {
-      const permisos = await googleClient.verificarPermisos(labId, email);
-      autorizado = permisos.autorizado;
-      esAdmin = permisos.esAdmin;
+      if (req.appConfig.isDemo === 'SI') {
+        autorizado = true;
+        esAdmin = req.appConfig.demoRol === 'ADMIN';
+      } else {
+        const permisos = await googleClient.verificarPermisos(labId, email);
+        autorizado = permisos.autorizado;
+        esAdmin = permisos.esAdmin;
+      }
     }
 
     if (req.appConfig.accesoPublico === 'NO' && !autorizado) {
@@ -142,7 +154,15 @@ router.get('/lab/:labId', async (req, res) => {
     return res.redirect(`/inventariolab/lab/${labId}/login`);
   }
 
-  const permisos = await googleClient.verificarPermisos(labId, email);
+  let permisos = { autorizado: false, esAdmin: false };
+  
+  if (req.appConfig.isDemo === 'SI') {
+    permisos.autorizado = true;
+    permisos.esAdmin = req.appConfig.demoRol === 'ADMIN';
+  } else {
+    permisos = await googleClient.verificarPermisos(labId, email);
+  }
+
   if (!permisos.autorizado) {
     return res.render('access_denied', { email, config: req.appConfig });
   }
@@ -226,7 +246,14 @@ const apiAuth = async (req, res, next) => {
   const labId = req.params.labId;
   if (!email || req.session.labId !== labId) return res.status(401).json({ error: 'No autenticado' });
   
-  const permisos = await googleClient.verificarPermisos(labId, email);
+  let permisos = { autorizado: false, esAdmin: false };
+  if (req.appConfig.isDemo === 'SI') {
+    permisos.autorizado = true;
+    permisos.esAdmin = req.appConfig.demoRol === 'ADMIN';
+  } else {
+    permisos = await googleClient.verificarPermisos(labId, email);
+  }
+
   if (!permisos.autorizado) return res.status(403).json({ error: 'No autorizado' });
   
   req.userPermisos = permisos;

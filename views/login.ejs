@@ -74,7 +74,12 @@
   <link rel="icon" href="/inventariolab/public/app_icon">
 </head>
 <body>
-  <div class="card">
+
+<% if (typeof config !== 'undefined' && config.isDemo === 'SI') { %>
+  <div style="position:fixed;top:30px;right:-40px;background:#e74c3c;color:white;padding:5px 40px;transform:rotate(45deg);font-weight:bold;z-index:99999;pointer-events:none;box-shadow:0 2px 4px rgba(0,0,0,0.2); letter-spacing: 1px;">MODO DEMO</div>
+<% } %>
+
+<div class="card">
     <span class="icon">🔬</span>
     <h2><%= config.laboratorio %></h2>
     <p><%= config.institucion %><br>Acceso requerido para docentes y administradores.</p>
