@@ -89,10 +89,15 @@
     </a>
 
     <div class="footer-info">
-      Debes ingresar con el correo autorizado en la configuración del laboratorio.
+      Debes ingresar con el correo autorizado en la configuración del laboratorio.<br><br>
+      <a href="#" onclick="desconectarPlanilla(); return false;" style="color: #e74c3c; text-decoration: none; font-weight: bold;">← Equivoqué el ID, elegir otro laboratorio</a>
     </div>
   </div>
   <script>
+    function desconectarPlanilla() {
+      localStorage.removeItem('recentLabId');
+      window.location.href = "/inventariolab";
+    }
     // Registrar Service Worker para la PWA
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

@@ -24,7 +24,13 @@
       <code><%= serviceAccountEmail %></code>
     </div>
     
-    <a href="/inventariolab" class="btn">← Volver al Inicio</a>
+    <a href="#" onclick="desconectarPlanilla(); return false;" class="btn">← Volver al Inicio</a>
   </div>
+  <script>
+    function desconectarPlanilla() {
+      localStorage.removeItem('recentLabId');
+      window.location.href = "/inventariolab";
+    }
+  </script>
 </body>
 </html>
