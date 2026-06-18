@@ -61,11 +61,13 @@
       <h3>🔍 Buscador Global</h3>
       <p>Localiza stock y ubicación por nombre o coincidencia parcial.</p>
     </div>
-    <% if (esAdmin) { %>
+    <% if (esAdmin && typeof email !== 'undefined' && email === 'trujillo.leonardo@gmail.com') { %>
     <div class="card" onclick="loadNoPhoto()">
       <h3>📷 Faltan Fotos</h3>
       <p>Lista de materiales que aún no tienen una imagen asignada.</p>
     </div>
+    <% } %>
+    <% if (esAdmin) { %>
     <div class="card" onclick="loadExploreZones()">
       <h3>📦 Explorar por Armario</h3>
       <p>Simula el escaneo de un código QR para ver el contenido tal cual se ve en el móvil.</p>
