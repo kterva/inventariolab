@@ -72,6 +72,10 @@
       <p>1. Imprimir códigos QR según selección. 2. Agregar, eliminar o editar nombres y descripciones de los sectores. </p>
     </div>
     <% } %>
+    <div class="card" onclick="desconectarPlanilla()" style="border-top: 4px solid #e74c3c;">
+      <h3>🔌 Cambiar de Planilla</h3>
+      <p>Desconecta esta base de datos para ingresar un ID diferente.</p>
+    </div>
   </div>
 
   <div id="view-search" class="hidden">
@@ -127,10 +131,20 @@
   const WEB_APP_URL = "/inventariolab/lab/" + LAB_ID;
 
   document.addEventListener('DOMContentLoaded', () => {
+    // Guardar siempre como planilla reciente al entrar al dashboard
+    localStorage.setItem('recentLabId', LAB_ID);
+    
     if (!ES_ADMIN) {
       showView('search');
     }
   });
+
+  function desconectarPlanilla() {
+    if (confirm("¿Estás seguro de que quieres desconectar esta planilla de tu dispositivo? Podrás volver a ingresar su ID más tarde.")) {
+      localStorage.removeItem('recentLabId');
+      window.location.href = "/inventariolab";
+    }
+  }
 
   function abrirConCarga(url) {
     // En móviles, abrir about:blank y escribir HTML rompe la escala visual.

@@ -155,11 +155,8 @@
       <input type="text" id="sheetId" placeholder="Ej: 1kp3Rs5WfrePoIkoOCBs..." onkeypress="if(event.key === 'Enter') ingresar()">
     </div>
     
-    <div id="recentLabsContainer" style="display: none; text-align: left; margin-bottom: 1.5rem; background: #eef2ff; padding: 15px; border-radius: 8px; border: 1px solid #c7d2fe;">
-      <label style="display:block; font-weight:bold; color:#3730a3; margin-bottom:10px; font-size:0.9rem;">🕒 Laboratorio Reciente:</label>
-      <button id="btnRecent" class="btn" style="background: #4f46e5; font-size: 0.95rem; padding: 10px;" onclick="ingresarReciente()"></button>
     </div>
-
+    
     <button class="btn" onclick="ingresar()">Ir a mi Laboratorio</button>
 
     <div class="help-text">
@@ -187,17 +184,20 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const recentId = localStorage.getItem('recentLabId');
+      
+      // Auto-redirección silenciosa para PWAs y uso continuo
       if (recentId) {
-        document.getElementById('recentLabsContainer').style.display = 'block';
-        document.getElementById('btnRecent').innerText = "📦 Entrar al inventario: " + recentId.substring(0,8) + "...";
-        document.getElementById('btnRecent').dataset.id = recentId;
+        document.body.innerHTML = `
+          <div style="display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif; flex-direction:column; background:#f2f4f7;">
+            <div style="width:40px;height:40px;border:4px solid #ccc;border-top-color:#1a5276;border-radius:50%;animation:spin .75s linear infinite;"></div>
+            <h3 style="color:#1a5276; margin-top:20px;">Cargando tu inventario...</h3>
+            <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+          </div>
+        `;
+        window.location.href = "/inventariolab/lab/" + recentId;
+        return;
       }
     });
-
-    function ingresarReciente() {
-      const id = document.getElementById('btnRecent').dataset.id;
-      if (id) window.location.href = "/inventariolab/lab/" + id;
-    }
 
     function ingresar() {
       let input = document.getElementById('sheetId').value.trim();
