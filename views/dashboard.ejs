@@ -23,6 +23,8 @@
     .loader { color: #7f8c8d; font-style: italic; padding: 10px 0; text-align: center; }
     .zone-box { background: #e8f4f8; border: 1px solid #bce0ee; padding: 15px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; color: var(--primary); display: flex; justify-content: space-between; align-items: center; }
     .logout-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); padding: 5px 10px; border-radius: 4px; color: white; text-decoration: none; font-size: 0.85rem; margin-left: 10px; }
+    .tooltip-icon { display: inline-block; width: 18px; height: 18px; background: #3498db; color: white; border-radius: 50%; text-align: center; font-size: 12px; line-height: 18px; cursor: help; margin-left: 5px; position: relative; vertical-align: middle; }
+    .tooltip-icon:hover::after, .tooltip-icon:active::after { content: attr(data-tip); position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%); background: #2c3e50; color: white; padding: 5px 10px; border-radius: 4px; font-size: 12px; z-index: 10; font-weight: normal; width: max-content; max-width: 200px; white-space: normal; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
   </style>
   <meta name="theme-color" content="#1a5276">
   <meta name="mobile-web-app-capable" content="yes">
@@ -51,12 +53,16 @@
 
 <div class="container">
   <div id="view-home">
-    <h2>Panel de Control</h2>
+    <h2>Panel de Control <span class="tooltip-icon" data-tip="Menú principal para acceder a todas las funciones del sistema">i</span></h2>
     <div class="card" onclick="showView('search')">
       <h3>🔍 Buscador Global</h3>
       <p>Localiza stock y ubicación por nombre o coincidencia parcial.</p>
     </div>
     <% if (esAdmin) { %>
+    <div class="card" onclick="loadNoPhoto()">
+      <h3>📷 Faltan Fotos</h3>
+      <p>Lista de materiales que aún no tienen una imagen asignada.</p>
+    </div>
     <div class="card" onclick="loadExploreZones()">
       <h3>📦 Explorar por Armario</h3>
       <p>Simula el escaneo de un código QR para ver el contenido tal cual se ve en el móvil.</p>
@@ -70,7 +76,7 @@
 
   <div id="view-search" class="hidden">
     <button onclick="history.back()">← Volver</button>
-    <h2>Buscador de Artículos</h2>
+    <h2>Buscador de Artículos <span class="tooltip-icon" data-tip="Escribe al menos 2 letras para buscar en todo el inventario">i</span></h2>
     <div class="search-box">
       <input type="text" id="searchInput" placeholder="Ej: Lupa, Multímetro..." onkeypress="if(event.key === 'Enter') doSearch()">
       <button onclick="doSearch()" style="width: 120px; margin-top: 10px;">🔍 Buscar</button>
@@ -80,13 +86,13 @@
 
   <div id="view-explore" class="hidden">
     <button onclick="history.back()">← Volver</button>
-    <h2>Seleccionar Ubicación</h2>
+    <h2>Seleccionar Ubicación <span class="tooltip-icon" data-tip="Elige un armario para ver todos los artículos que contiene">i</span></h2>
     <div id="exploreList"></div>
   </div>
 
 <div id="view-zones" class="hidden">
     <button onclick="history.back()">← Volver</button>
-    <h2>1. Impresión de Códigos QR</h2>
+    <h2>1. Impresión de Códigos QR <span class="tooltip-icon" data-tip="Marca los armarios y presiona el botón verde para generar los QRs listos para imprimir">i</span></h2>
     
     <div style="background: #e8f4f8; padding: 10px; border-radius: 4px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #bce0ee;">
       <label style="cursor:pointer; font-weight:bold; color:#1a5276;"><input type="checkbox" id="checkAllZones" onclick="toggleAll(this.checked)"> Seleccionar todos</label>
@@ -96,7 +102,7 @@
     <div id="zoneList"></div>
     <hr>
     
-    <h2>2. Configuración de Ubicaciones</h2>
+    <h2>2. Configuración de Ubicaciones <span class="tooltip-icon" data-tip="Crea nuevos armarios, o toca uno existente en la lista de arriba para editarlo o eliminarlo">i</span></h2>
     <h4 id="formZoneTitle">Nueva Zona</h4>
     <input type="hidden" id="zId"> 
     <input type="text" id="zNombre" placeholder="Nombre (Ej: Estante Vidriería)">
@@ -107,6 +113,12 @@
       <button id="btnDeleteZone" onclick="deleteZone()" style="flex: 1; min-width: 100px; background: #e74c3c; display: none;">Eliminar</button> 
       <button onclick="clearZoneForm()" style="flex: 1; min-width: 100px; background: #7f8c8d;">Cancelar / Nueva</button>
     </div>
+  </div>
+
+  <div id="view-nophoto" class="hidden">
+    <button onclick="history.back()">← Volver</button>
+    <h2>Materiales sin Foto <span class="tooltip-icon" data-tip="Toca un artículo para ir a su armario y tomarle una fotografía">i</span></h2>
+    <div id="noPhotoResults"></div>
   </div>
 
 <script>
@@ -202,7 +214,7 @@
   }
 
   function mostrarVistaInterna(viewId) {
-    ['home', 'search', 'explore', 'zones'].forEach(v => document.getElementById('view-' + v).classList.add('hidden'));
+    ['home', 'search', 'explore', 'zones', 'nophoto'].forEach(v => document.getElementById('view-' + v).classList.add('hidden'));
     document.getElementById('view-' + viewId).classList.remove('hidden');
     if(viewId === 'search') document.getElementById('searchInput').focus();
   }
@@ -262,6 +274,42 @@
           <span style="font-size: 0.8em; background: #fff; padding: 2px 8px; border-radius: 10px; color: #666;">Abrir Vista QR →</span>
         </div>`
       ).join('');
+    } catch (err) {
+      div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error: ' + err.message + '</div>';
+    }
+  }
+
+  async function loadNoPhoto() {
+    showView('nophoto');
+    const div = document.getElementById('noPhotoResults');
+    div.innerHTML = '<div class="loader">⏳ Buscando materiales sin foto...</div>';
+    
+    try {
+      const res = await fetch(`/inventariolab/lab/${LAB_ID}/api/buscar?q=`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error de servidor');
+      
+      const faltan = data.filter(item => !item.foto || item.foto.trim() === '');
+      
+      if (faltan.length === 0) {
+        div.innerHTML = '<div class="loader">¡Excelente! Todos los materiales tienen foto.</div>';
+        return;
+      }
+      
+      let htmlStr = `<div style="margin-bottom:15px; font-weight:bold; color:#e74c3c;">Faltan ${faltan.length} fotos en total.</div>`;
+      faltan.forEach(function(item) {
+        const ubi = item.ubicacion ? item.ubicacion.toString().trim() : "";
+        const link = ubi ? WEB_APP_URL + "?zona=" + encodeURIComponent(ubi) + "#item-" + item.fila : null;
+        const clickAttr = link ? `onclick="abrirConCarga('${link}')"` : '';
+        const styleAttr = link ? 'style="cursor:pointer;" title="Ir al armario para tomar la foto"' : '';
+        const icon = link ? ' <span style="background:#1a5276; color:white; padding:2px 6px; border-radius:4px; font-size:0.75em; margin-left:5px;">📸 Ir a sacar foto</span>' : '';
+        
+        htmlStr += '<div class="result-item" ' + clickAttr + ' ' + styleAttr + '>' +
+          '<strong>' + item.articulo + '</strong><br>' +
+          '<small>📍 ' + (ubi || 'Sin ubicación') + icon + '</small>' +
+          '</div>';
+      });
+      div.innerHTML = htmlStr;
     } catch (err) {
       div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error: ' + err.message + '</div>';
     }
