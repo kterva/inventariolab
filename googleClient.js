@@ -76,6 +76,9 @@ async function getAppConfig(sheetId) {
     }
   } catch (e) {
     console.error(`[getAppConfig] Error al leer config de ${sheetId}:`, e.message);
+    if (e.message.includes("Requested entity was not found") || e.message.includes("permission") || e.message.includes("unregistered")) {
+      throw new Error("ACCESO_DENEGADO");
+    }
   }
   return config;
 }

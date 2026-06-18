@@ -70,7 +70,7 @@ router.get('/sw.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'sw.js'));
 });
 
-// Middleware de inyección de configuración
+// Middleware de inyección de configuración y protección
 router.use('/lab/:labId', async (req, res, next) => {
   try {
     const config = await googleClient.getAppConfig(req.params.labId);
@@ -84,6 +84,12 @@ router.use('/lab/:labId', async (req, res, next) => {
     
     next();
   } catch (err) {
+    if (err.message === "ACCESO_DENEGADO") {
+      // Remover cualquier id defectuoso o sin permisos del cliente
+      return res.render('setup_error', { 
+        serviceAccountEmail: googleClient.SERVICE_ACCOUNT_EMAIL || 'inventario-server-770@gen-lang-client-0264087708.iam.gserviceaccount.com'
+      });
+    }
     console.error('Error al obtener config:', err);
     res.status(500).send('Error de servidor al contactar Google Sheets.');
   }

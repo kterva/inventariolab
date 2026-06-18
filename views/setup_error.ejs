@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Error de Conexión - InventarioLab</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #f2f4f7; color: #1a1a1a; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+    .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 500px; width: 100%; text-align: center; border-top: 5px solid #e74c3c; }
+    h1 { color: #c0392b; margin-top: 0; }
+    p { line-height: 1.6; color: #4a5568; }
+    .btn { display: inline-block; margin-top: 20px; padding: 12px 24px; background: #1a5276; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; }
+    code { background: #f1f2f6; padding: 5px 10px; border-radius: 4px; color: #2c3e50; font-size: 0.9em; word-break: break-all; display: block; margin: 15px 0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div style="font-size: 3rem; margin-bottom: 10px;">🔒</div>
+    <h1>Acceso Denegado a la Planilla</h1>
+    <p>El sistema no pudo acceder a tu base de datos de Google Sheets. Esto casi siempre ocurre porque <strong>olvidaste compartir la planilla</strong> con nuestra cuenta de servicio, o porque el ID es incorrecto.</p>
+    
+    <div style="background: #fff3cd; padding: 15px; border-left: 4px solid #ffeeba; border-radius: 4px; text-align: left; margin: 20px 0;">
+      <strong style="color: #856404;">Solución:</strong>
+      <p style="margin: 10px 0 0; font-size: 0.9rem; color: #856404;">Abre tu planilla en Google Sheets, toca el botón verde <strong>Compartir</strong>, y asegúrate de agregar permisos de <strong>Editor</strong> a este correo exacto:</p>
+      <code><%= serviceAccountEmail %></code>
+    </div>
+    
+    <a href="/inventariolab" class="btn">← Volver al Inicio</a>
+  </div>
+</body>
+</html>
