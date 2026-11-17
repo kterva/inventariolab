@@ -1,0 +1,59 @@
+// Escapado de HTML en las vistas: renderiza las plantillas con datos hostiles
+// y ejecuta el JS de la página en un navegador simulado.
+const test = require('node:test');
+const assert = require('node:assert');
+const ejs = require('ejs');
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+
+const vista = n => fs.readFileSync(path.join(__dirname, '..', 'views', n), 'utf8');
+const scripts = html => [...html.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+// Objeto "comodín": cualquier propiedad o llamada devuelve otro comodín
+const stub = () => new Proxy(function () {}, { get: (t, k) => k === Symbol.toPrimitive ? () => '' : stub(), apply: () => stub() });
+const navegador = () => vm.createContext({ document: stub(), window: stub(), history: stub(), navigator: stub(), localStorage: stub(), location: stub(), setTimeout() {}, console });
+
+const X = `<img src=x onerror=alert(1)>'"</script><script>alert(2)</script>`;
+const fila = { fila: 7, articulo: 'Probeta ' + X, bien: 2, regular: '1' + X, roto: 0, total: 3, obs: 'obs ' + X,
+  historial: '[17/11/26] (a@b) ' + X + '\nviejo', foto: 'javascript:alert(3)', zona: "Z1');alert(4);('" };
+const config = { laboratorio: 'Lab', institucion: 'Liceo', esAdmin: true, autorizado: true, puedeReportar: true, email: 'yo@x', zonasAdmin: ['Z1', X] };
+
+function cargarArmario(cfg) {
+  const html = ejs.render(vista('armario.ejs'), { zona: 'Z1', filas: [fila], config: cfg, labId: 'ABC' });
+  const sc = scripts(html);
+  sc.forEach((c, i) => new vm.Script(c, { filename: 'armario-' + i }));
+  const ctx = navegador();
+  vm.runInContext(sc.find(c => c.includes('function render(')), ctx);
+  return { html, ctx };
+}
+
+test('armario: los datos se muestran como texto', () => {
+  const { html, ctx } = cargarArmario(config);
+  assert.ok(!html.includes('<script>alert(2)'), 'el JSON embebido no corta el <script>');
+  const out = vm.runInContext('render(DATA[0])', ctx);
+  assert.ok(!/<img src=x/i.test(out) && !/<script>/i.test(out), 'sin etiquetas inyectadas');
+  assert.ok(out.includes('Probeta &lt;img src=x onerror=alert(1)&gt;&#39;&quot;&lt;/script&gt;'));
+  assert.ok(!out.includes('javascript:'), 'foto con URL no https descartada');
+  assert.ok(out.includes(`data-zona='Z1&#39;);alert(4);(&#39;'`) && out.includes('abrirModalMover(7, this.dataset.zona)'));
+  assert.equal(vm.runInContext('DATA[0].articulo', ctx), fila.articulo, 'los datos llegan intactos al JS');
+  const conFoto = vm.runInContext(`render(Object.assign({}, DATA[0], {foto:'https://lh3.googleusercontent.com/d/abc'}))`, ctx);
+  assert.ok(conFoto.includes("data-src='https://lh3.googleusercontent.com/d/abc'"));
+});
+
+test('armario: formulario de reporte según el rol', () => {
+  const render = cfg => vm.runInContext('render(DATA[0])', cargarArmario({ ...config, esAdmin: false, ...cfg }).ctx);
+  assert.ok(!render({ autorizado: true, puedeReportar: false }).includes('rep-input'), 'VISOR: sin formulario');
+  const lector = render({ autorizado: true, puedeReportar: true });
+  assert.ok(lector.includes('rep-input') && !lector.includes('disabled'), 'LECTOR: formulario activo');
+  assert.ok(render({ autorizado: false, puedeReportar: false }).includes('disabled'), 'invitado: deshabilitado');
+});
+
+test('dashboard: esc() y scripts válidos', () => {
+  const html = ejs.render(vista('dashboard.ejs'), { config, esAdmin: true, rol: 'ADMIN', email: 'yo@x', labId: 'ABC' });
+  scripts(html).forEach((c, i) => new vm.Script(c, { filename: 'dashboard-' + i }));
+  const ctx = navegador();
+  vm.runInContext(scripts(html).find(c => c.includes('function esc(')), ctx);
+  assert.equal(vm.runInContext('WEB_APP_URL', ctx), '/inventariolab/lab/ABC');
+  assert.equal(vm.runInContext(`esc(${JSON.stringify(X)})`, ctx),
+    '&lt;img src=x onerror=alert(1)&gt;&#39;&quot;&lt;/script&gt;&lt;script&gt;alert(2)&lt;/script&gt;');
+});
