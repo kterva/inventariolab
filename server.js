@@ -322,8 +322,8 @@ router.get('/lab/:labId/api/buscar', apiAuth, async (req, res) => {
 router.post('/lab/:labId/api/reportar', apiAuth, requireReportar, async (req, res) => {
   try {
     const { id, texto } = req.body;
-    await googleClient.registrarReporte(req.params.labId, req.userEmail, id, texto);
-    res.json({ success: true });
+    const { ultimo } = await googleClient.registrarReporte(req.params.labId, req.userEmail, id, texto);
+    res.json({ success: true, ultimo });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -332,8 +332,8 @@ router.post('/lab/:labId/api/reportar', apiAuth, requireReportar, async (req, re
 router.post('/lab/:labId/api/foto', apiAuth, requireAdmin, async (req, res) => {
   try {
     const { id, base64, nombreArchivo } = req.body;
-    const url = await googleClient.subirFoto(req.params.labId, req.userEmail, id, base64, nombreArchivo);
-    res.json({ url });
+    const { url, ultimo } = await googleClient.subirFoto(req.params.labId, req.userEmail, id, base64, nombreArchivo);
+    res.json({ url, ultimo });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

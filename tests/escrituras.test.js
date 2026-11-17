@@ -87,7 +87,8 @@ test('reportar escribe en la fila correcta aunque se hayan reordenado e insertad
   resto.sort((a, b) => a[0].localeCompare(b[0]));
   datos.splice(0, datos.length, tit, enc, ['Nuevo', '', '1', '0', '0', '1', '', 'Z1'], ...resto);
 
-  await gc.registrarReporte('P3', 'docente@x.uy', probeta.id, '=HYPERLINK("http://malo") se rompió');
+  const resp = await gc.registrarReporte('P3', 'docente@x.uy', probeta.id, '=HYPERLINK("http://malo") se rompió');
+  assert.match(resp.ultimo, /^\[\d\d\/\d\d\/\d\d \d\d:\d\d\] \(docente@x\.uy\) =HYPERLINK\("http:\/\/malo"\) se rompió$/, 'devuelve el texto para mostrar sin recargar');
   const actual = filaDe('P3', 'Probeta');
   assert.equal(actual[10], '(docente@x.uy) =HYPERLINK("http://malo") se rompió', 'ticket en K de la Probeta');
   assert.match(actual[8], /^\d\d\/\d\d\/\d\d \d\d:\d\d$/, 'fecha en I');
@@ -109,7 +110,8 @@ test('mover y foto quedan en el historial; reportes concurrentes no se pisan', a
   await gc.getAppConfig('P4');
   await gc.cambiarUbicacion('P4', 'admin@x.uy', 'A0002', 'Z2');
   assert.equal(filaDe('P4', 'Balanza')[7], 'Z2');
-  const url = await gc.subirFoto('P4', 'admin@x.uy', 'A0003', 'data:image/jpeg;base64,' + Buffer.from('jpg').toString('base64'), 'x.jpg');
+  const { url, ultimo } = await gc.subirFoto('P4', 'admin@x.uy', 'A0003', 'data:image/jpeg;base64,' + Buffer.from('jpg').toString('base64'), 'x.jpg');
+  assert.match(ultimo, /\(admin@x\.uy\) 📸 Imagen agregada$/);
   assert.match(url, /^https:\/\/lh3\.googleusercontent\.com\/d\/archivo-img_A0003_/);
   assert.equal(filaDe('P4', 'Imán')[13], url);
 

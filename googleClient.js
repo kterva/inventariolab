@@ -431,6 +431,11 @@ function idDeFila(row) {
   return ID_VALIDO.test(id) ? id : '';
 }
 
+/** Cómo se muestra un evento de HISTORIAL en el armario ("🕒 ...") */
+function textoEvento(fecha, email, detalle) {
+  return `[${fecha || ''}] (${email || ''}) ${detalle || ''}`.trim();
+}
+
 /**
  * Última entrada de la hoja HISTORIAL por ID de artículo. Las filas se
  * agregan al final, así que la última que aparece es la más reciente.
@@ -439,7 +444,7 @@ function ultimosEventos(datos) {
   const ultimos = new Map();
   for (const r of datos.historial || []) {
     const id = (r[1] || '').toString().trim();
-    if (id) ultimos.set(id, `[${r[0] || ''}] (${r[3] || ''}) ${r[5] || r[4] || ''}`.trim());
+    if (id) ultimos.set(id, textoEvento(r[0], r[3], r[5] || r[4]));
   }
   return ultimos;
 }
@@ -682,10 +687,11 @@ async function subirFoto(sheetId, email, id, base64Str, nombreArchivo) {
   const fecha = getFormattedDate();
 
   await escribirFila(sheetId, art.fila, { [LETRA(COL.FOTO)]: url, [LETRA(COL.FECHA)]: fecha });
-  await registrarEvento(sheetId, art, email, 'FOTO',
-    art.foto ? '🔄 Imagen actualizada' : '📸 Imagen agregada', fecha);
+  const detalle = art.foto ? '🔄 Imagen actualizada' : '📸 Imagen agregada';
+  await registrarEvento(sheetId, art, email, 'FOTO', detalle, fecha);
 
-  return url;
+  // `ultimo` es lo que la página muestra enseguida, sin recargar
+  return { url, ultimo: textoEvento(fecha, email, detalle) };
 }
 
 /** Registra un reporte de incidencia */
@@ -704,7 +710,8 @@ async function registrarReporte(sheetId, email, id, texto) {
     [LETRA(COL.REP)]: `(${email}) ${txt}`,
   });
   await registrarEvento(sheetId, art, email, 'REPORTE', txt, fecha);
-  return true;
+  // Texto del evento, para que la página lo muestre enseguida sin recargar
+  return { ultimo: textoEvento(fecha, email, txt) };
 }
 
 /** Cambia la zona de un artículo */

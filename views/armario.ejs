@@ -38,7 +38,11 @@ header .sub{font-size:.8rem;opacity:.75}
 .total{background:#e2e8f0;color:#334155}
 
 .obs{font-size:.8rem; color:#555; border-left:3px solid #aaa; padding:.3rem .6rem; margin:.4rem 0; background:#fafafa; border-radius:0 4px 4px 0}
-.last{font-size:.75rem;color:#888;margin:.3rem 0}
+.last{font-size:.75rem;color:#888;margin:.3rem 0;transition:background 1.5s ease;border-radius:4px}
+.last.nuevo{background:#d4edda;color:#155724}
+.aviso-rep{font-size:.8rem;margin-top:6px;min-height:1em}
+.aviso-rep.ok{color:#1e8449}
+.aviso-rep.error{color:#c0392b}
 
 .thumb{
   width:90px; height:90px; min-width: 90px; min-height: 90px; object-fit:cover; border-radius:8px; margin:.5rem 0; cursor:pointer; display:block
@@ -385,6 +389,7 @@ function procesarArchivo(input) {
           if (!res.ok) throw new Error(data.error || 'Error de servidor');
           
           btnFoto.innerText = "✅ Subida"; btnFoto.disabled = false;
+          mostrarUltimo(item, data.ultimo);
           var thumb = item.querySelector(".thumb");
           if (thumb) { thumb.src = data.url; thumb.dataset.src = data.url; }
           else {
@@ -403,26 +408,60 @@ function procesarArchivo(input) {
   reader.readAsDataURL(file);
 }
 
+/** Muestra (o reemplaza) la línea "🕒 último evento" del artículo, resaltada un momento */
+function mostrarUltimo(item, texto) {
+  if (!texto) return;
+  var linea = item.querySelector(".last");
+  if (!linea) {
+    linea = document.createElement("div");
+    linea.className = "last";
+    var antes = item.querySelector(".thumb") || item.querySelector(".upload-wrap") || item.querySelector(".rep-wrap");
+    item.insertBefore(linea, antes);
+  }
+  linea.textContent = "🕒 " + texto; // textContent: el texto del usuario nunca se interpreta como HTML
+  linea.classList.add("nuevo");
+  setTimeout(function() { linea.classList.remove("nuevo"); }, 4000);
+}
+
+/** Mensaje bajo el formulario de reporte (confirmación o error), visible hasta el próximo envío */
+function avisoReporte(item, texto, tipo) {
+  var aviso = item.querySelector(".aviso-rep");
+  if (!aviso) {
+    aviso = document.createElement("div");
+    item.querySelector(".rep-wrap").appendChild(aviso);
+  }
+  aviso.className = "aviso-rep " + tipo;
+  aviso.textContent = texto;
+}
+
 async function enviar(btn) {
-  var inp = itemDe(btn).querySelector(".rep-input");
+  var item = itemDe(btn);
+  var inp = item.querySelector(".rep-input");
   var txt = inp.value.trim();
-  if (txt.length < 5) return;
+  if (txt.length < 5) {
+    avisoReporte(item, "Describí el problema con un poco más de detalle (al menos 5 caracteres).", "error");
+    inp.focus();
+    return;
+  }
   btn.disabled = true; btn.innerText = "Enviando...";
+  avisoReporte(item, "", "");
   
   try {
     const res = await fetch(`/inventariolab/lab/${LAB_ID}/api/reportar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: itemDe(btn).dataset.id, texto: txt })
+      body: JSON.stringify({ id: item.dataset.id, texto: txt })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Error de servidor');
     
     inp.value = ""; btn.innerText = "✔ Enviado";
+    mostrarUltimo(item, data.ultimo);
+    avisoReporte(item, "✔ Reporte registrado. Los administradores ya lo pueden ver.", "ok");
     setTimeout(function() { btn.disabled = false; btn.innerText = "Reportar"; }, 2000);
   } catch(err) {
     btn.disabled = false; btn.innerText = "Reportar";
-    alert("Error al enviar reporte: " + err.message);
+    avisoReporte(item, "No se pudo enviar el reporte: " + err.message, "error");
   }
 }
 
