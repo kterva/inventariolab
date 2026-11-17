@@ -5,6 +5,7 @@ const path = require('path');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const googleClient = require('./googleClient');
+const FileSessionStore = require('./sessionStore');
 
 const app = express();
 app.set('trust proxy', 1); // Confiar en el proxy de Nginx
@@ -30,12 +31,28 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Configuración de Sesiones
+// El secreto firma las cookies de sesión: con el valor de ejemplo (público en
+// el repo) cualquiera podría fabricar una sesión válida.
+const SECRETOS_INSEGUROS = ['', 'inventariolab-secret', 'un_secreto_super_seguro_para_vps'];
+const SESSION_SECRET = process.env.SESSION_SECRET || '';
+if (SECRETOS_INSEGUROS.includes(SESSION_SECRET) || SESSION_SECRET.length < 32) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ SESSION_SECRET falta o es inseguro. Generá uno con: openssl rand -hex 32');
+    process.exit(1);
+  }
+  console.warn('⚠️ SESSION_SECRET inseguro: aceptable solo en desarrollo.');
+}
+
+// Las sesiones se guardan en archivos (carpeta sessions/), así un reinicio o
+// despliegue no cierra la sesión de todos los usuarios.
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'inventariolab-secret',
+  store: new FileSessionStore({ dir: process.env.SESSIONS_DIR || path.join(__dirname, 'sessions') }),
+  secret: SESSION_SECRET || 'solo-desarrollo',
   resave: false,
   saveUninitialized: false,
-  cookie: { 
-    secure: false, 
+  cookie: {
+    secure: 'auto', // Secure cuando la petición llega por HTTPS (vía proxy)
+    httpOnly: true,
     sameSite: 'lax',
     maxAge: 30 * 24 * 60 * 60 * 1000 // 30 días
   }
