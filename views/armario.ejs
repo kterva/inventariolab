@@ -135,11 +135,21 @@ header .sub{font-size:.8rem;opacity:.75}
 <script>
 let paginaActual = 0;
 const LIMIT = 20;
-const DATA = <%- JSON.stringify(filas) %>;
-const ZONAS = <%- JSON.stringify(config.zonasAdmin) %>;
+const DATA = <%- JSON.stringify(filas).replace(/</g, '\\u003c') %>;
+const ZONAS = <%- JSON.stringify(config.zonasAdmin).replace(/</g, '\\u003c') %>;
 const ADMIN = <%= config.esAdmin %>;
 const AUTORIZADO = <%= config.autorizado %>;
-const LAB_ID = "<%= labId %>";
+const LAB_ID = <%- JSON.stringify(labId).replace(/</g, '\\u003c') %>;
+
+// Escapa texto antes de insertarlo como HTML (los datos vienen de la planilla y de los usuarios)
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function(c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+// Solo se aceptan URLs de imagen https
+function urlSegura(u) { u = String(u || '').trim(); return /^https:\/\//i.test(u) ? u : ''; }
+
 
 function cambiarPagina(direccion) {
   var cont = document.getElementById("contenedor");
@@ -233,41 +243,44 @@ window.addEventListener("popstate", function() {
 
 function render(f) {
   if (!f.articulo) return "";
-  
-  var badges = (f.roto > 0 ? "<span class='badge roto'>🔴 Roto: " + f.roto + "</span>" : "") +
-               (f.regular > 0 ? "<span class='badge reg'>🟡 Regular: " + f.regular + "</span>" : "") +
-               (f.bien > 0 ? "<span class='badge bien'>🟢 Bien: " + f.bien + "</span>" : "") +
-               "<span class='badge total'>📦 Total: " + f.total + "</span>";
-  
+  var fila = Number(f.fila);
+
+  var badges = (f.roto > 0 ? "<span class='badge roto'>🔴 Roto: " + esc(f.roto) + "</span>" : "") +
+               (f.regular > 0 ? "<span class='badge reg'>🟡 Regular: " + esc(f.regular) + "</span>" : "") +
+               (f.bien > 0 ? "<span class='badge bien'>🟢 Bien: " + esc(f.bien) + "</span>" : "") +
+               "<span class='badge total'>📦 Total: " + esc(f.total) + "</span>";
+
   var ultimo = f.historial ? f.historial.split("\\n")[0] : "";
-  
+
   var btnFoto = "";
   if (ADMIN) {
-    btnFoto = "<div class='upload-wrap'><input type='file' id='finput" + f.fila + "' accept='image/*' capture='environment' style='display:none' onchange='procesarArchivo(this," + f.fila + ")'><button class='rep-btn' id='btn-foto-" + f.fila + "' onclick='abrirSelector(" + f.fila + ")'>📸 Foto</button><span id='msg-foto-" + f.fila + "' class='msg'></span></div>";
+    btnFoto = "<div class='upload-wrap'><input type='file' id='finput" + fila + "' accept='image/*' capture='environment' style='display:none' onchange='procesarArchivo(this," + fila + ")'><button class='rep-btn' id='btn-foto-" + fila + "' onclick='abrirSelector(" + fila + ")'>📸 Foto</button><span id='msg-foto-" + fila + "' class='msg'></span></div>";
   }
 
   var btnMover = "";
   if (ADMIN) {
-    btnMover = "<button class='rep-btn' style='background:#d35400;' onclick='abrirModalMover(" + f.fila + ", &#39;" + f.zona + "&#39;)'>🚚 Mover</button>";
+    // La zona viaja en un atributo data-* en vez de dentro del código del onclick
+    btnMover = "<button class='rep-btn' style='background:#d35400;' data-zona='" + esc(f.zona) + "' onclick='abrirModalMover(" + fila + ", this.dataset.zona)'>🚚 Mover</button>";
   }
 
-  var html = "<div class='item' id='item-" + f.fila + "'>";
-  html += "<div class='art'>" + f.articulo + "</div>";
+  var foto = urlSegura(f.foto);
+  var html = "<div class='item' id='item-" + fila + "'>";
+  html += "<div class='art'>" + esc(f.articulo) + "</div>";
   html += "<div class='badges'>" + badges + "</div>";
-  if (f.obs) html += "<div class='obs'>📝 " + f.obs + "</div>";
-  if (ultimo) html += "<div class='last'>🕒 " + ultimo + "</div>";
-  if (f.foto) html += "<img class='thumb' data-src='" + f.foto + "' loading='lazy'>";
+  if (f.obs) html += "<div class='obs'>📝 " + esc(f.obs) + "</div>";
+  if (ultimo) html += "<div class='last'>🕒 " + esc(ultimo) + "</div>";
+  if (foto) html += "<img class='thumb' data-src='" + esc(foto) + "' loading='lazy'>";
   html += btnFoto;
   html += "<div class='rep-wrap'>";
   if (AUTORIZADO) {
-    html += "<input class='rep-input' data-fila='" + f.fila + "' placeholder='Describí el problema...'>";
+    html += "<input class='rep-input' data-fila='" + fila + "' placeholder='Describí el problema...'>";
     html += "<div style='display:flex; gap:6px;'>" + "<button class='rep-btn' onclick='enviar(this)'>Reportar</button>" + btnMover + "</div>";
   } else {
     html += "<input class='rep-input' placeholder='Inicia sesión para reportar...' disabled>";
     html += "<div style='display:flex; gap:6px;'>" + "<button class='rep-btn' style='background:#95a5a6; cursor:not-allowed;' disabled>Reportar</button>" + btnMover + "</div>";
   }
   html += "</div></div>";
-  
+
   return html;
 }
 
@@ -282,7 +295,7 @@ function abrirModalMover(fila, zonaActual) {
   var select = document.getElementById('selectNuevaZona');
   select.innerHTML = '<option value="">-- Destino --</option>';
   ZONAS.forEach(function(z) {
-    if (z !== zonaActual) select.innerHTML += '<option value="' + z + '">' + z + '</option>';
+    if (z !== zonaActual) select.add(new Option(z, z));
   });
   document.getElementById('modalMover').style.display = 'flex';
 }

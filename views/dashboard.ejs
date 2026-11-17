@@ -128,8 +128,18 @@
 
 <script>
   const ES_ADMIN = <%= esAdmin %>;
-  const LAB_ID = "<%= labId %>";
+  const LAB_ID = <%- JSON.stringify(labId).replace(/</g, '\\u003c') %>;
   const WEB_APP_URL = "/inventariolab/lab/" + LAB_ID;
+
+  // Escapa texto antes de insertarlo como HTML (los datos vienen de la planilla y de los usuarios)
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function(c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  // Solo se aceptan URLs de imagen https
+  function urlSegura(u) { u = String(u || '').trim(); return /^https:\/\//i.test(u) ? u : ''; }
+
 
   document.addEventListener('DOMContentLoaded', () => {
     // Guardar siempre como planilla reciente al entrar al dashboard
@@ -252,17 +262,17 @@
       data.forEach(function(item) {
         const ubi = item.ubicacion ? item.ubicacion.toString().trim() : "";
         const link = ubi ? WEB_APP_URL + "?zona=" + encodeURIComponent(ubi) + "#item-" + item.fila : null;
-        const clickAttr = link ? `onclick="abrirConCarga('${link}')"` : '';
+        const clickAttr = link ? `data-href="${esc(link)}" onclick="abrirConCarga(this.dataset.href)"` : '';
         const styleAttr = link ? 'style="cursor:pointer;" title="Ir al armario"' : '';
         const icon = link ? ' 🔗' : '';
         htmlStr += '<div class="result-item" ' + clickAttr + ' ' + styleAttr + '>' +
-          '<strong>' + item.articulo + icon + '</strong><br>' +
-          '<small>📍 ' + (ubi || 'Sin ubicación') + ' | ✅ ' + item.bien + ' | ⚠️ ' + item.regular + ' | ❌ ' + item.roto + '</small>' +
+          '<strong>' + esc(item.articulo) + icon + '</strong><br>' +
+          '<small>📍 ' + esc(ubi || 'Sin ubicación') + ' | ✅ ' + esc(item.bien) + ' | ⚠️ ' + esc(item.regular) + ' | ❌ ' + esc(item.roto) + '</small>' +
           '</div>';
       });
       div.innerHTML = htmlStr;
     } catch (err) {
-      div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error al buscar: ' + err.message + '</div>';
+      div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error al buscar: ' + esc(err.message) + '</div>';
     }
   }
 
@@ -277,13 +287,13 @@
       if (!res.ok) throw new Error(data.error || 'Error de servidor');
       
       div.innerHTML = data.map(z =>
-        `<div class="zone-box" onclick="abrirConCarga('${WEB_APP_URL}?zona=${encodeURIComponent(z[1])}')">
-          <span>📍 ${z[1]}</span>
+        `<div class="zone-box" data-href="${esc(WEB_APP_URL + '?zona=' + encodeURIComponent(z[1] || ''))}" onclick="abrirConCarga(this.dataset.href)">
+          <span>📍 ${esc(z[1])}</span>
           <span style="font-size: 0.8em; background: #fff; padding: 2px 8px; border-radius: 10px; color: #666;">Abrir Vista QR →</span>
         </div>`
       ).join('');
     } catch (err) {
-      div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error: ' + err.message + '</div>';
+      div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error: ' + esc(err.message) + '</div>';
     }
   }
 
@@ -308,18 +318,18 @@
       faltan.forEach(function(item) {
         const ubi = item.ubicacion ? item.ubicacion.toString().trim() : "";
         const link = ubi ? WEB_APP_URL + "?zona=" + encodeURIComponent(ubi) + "#item-" + item.fila : null;
-        const clickAttr = link ? `onclick="abrirConCarga('${link}')"` : '';
+        const clickAttr = link ? `data-href="${esc(link)}" onclick="abrirConCarga(this.dataset.href)"` : '';
         const styleAttr = link ? 'style="cursor:pointer;" title="Ir al armario para tomar la foto"' : '';
         const icon = link ? ' <span style="background:#1a5276; color:white; padding:2px 6px; border-radius:4px; font-size:0.75em; margin-left:5px;">📸 Ir a sacar foto</span>' : '';
         
         htmlStr += '<div class="result-item" ' + clickAttr + ' ' + styleAttr + '>' +
-          '<strong>' + item.articulo + '</strong><br>' +
-          '<small>📍 ' + (ubi || 'Sin ubicación') + icon + '</small>' +
+          '<strong>' + esc(item.articulo) + '</strong><br>' +
+          '<small>📍 ' + esc(ubi || 'Sin ubicación') + icon + '</small>' +
           '</div>';
       });
       div.innerHTML = htmlStr;
     } catch (err) {
-      div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error: ' + err.message + '</div>';
+      div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error: ' + esc(err.message) + '</div>';
     }
   }
 
@@ -336,14 +346,14 @@
       
       div.innerHTML = data.map(z =>
         `<div class="result-item" style="display:flex; align-items:center; gap:10px;">
-          <input type="checkbox" name="zoneSelect" value="${z[0]}" style="width:auto; margin:0; transform:scale(1.2); cursor:pointer;">
-          <div onclick="editZone('${z[0]}','${z[1]}','${z[2]}')" style="flex:1; cursor:pointer;">
-            <strong>${z[0]}</strong>: ${z[1]}
+          <input type="checkbox" name="zoneSelect" value="${esc(z[0])}" style="width:auto; margin:0; transform:scale(1.2); cursor:pointer;">
+          <div data-id="${esc(z[0])}" data-nombre="${esc(z[1])}" data-desc="${esc(z[2])}" onclick="editZone(this.dataset.id, this.dataset.nombre, this.dataset.desc)" style="flex:1; cursor:pointer;">
+            <strong>${esc(z[0])}</strong>: ${esc(z[1])}
           </div>
         </div>`
       ).join('');
     } catch (err) {
-      div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error al cargar zonas: ' + err.message + '</div>';
+      div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error al cargar zonas: ' + esc(err.message) + '</div>';
     }
   }
 
