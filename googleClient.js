@@ -25,22 +25,139 @@ function getAuthClient() {
   return auth;
 }
 
-// Devuelve las instancias de las APIs configuradas
+// ─── CLIENTE ÚNICO ─────────────────────────────────────
+// Se crea una sola vez por proceso: así GoogleAuth reutiliza el token de la
+// cuenta de servicio en vez de pedir uno nuevo en cada consulta.
+let _apis = null;
 function getApis() {
+  if (_apis) return _apis;
   const auth = getAuthClient();
-  if (!auth) return { sheets: null, drive: null };
-  const sheets = google.sheets({ version: 'v4', auth });
-  const drive = google.drive({ version: 'v3', auth });
-  return { sheets, drive };
+  _apis = auth
+    ? { sheets: google.sheets({ version: 'v4', auth }), drive: google.drive({ version: 'v3', auth }) }
+    : { sheets: null, drive: null };
+  return _apis;
 }
+
+// ─── CACHÉ DE LECTURA ──────────────────────────────────
+// Cada laboratorio (planilla) se lee con UN solo batchGet que trae config,
+// inventario y ubicaciones, y se guarda en memoria durante CACHE_TTL_MS.
+// La planilla sigue siendo la fuente de verdad:
+//  - las escrituras de la app invalidan la caché del laboratorio;
+//  - los cambios hechos a mano en la planilla aparecen al vencer el TTL.
+
+const CACHE_TTL_MS = Number(process.env.SHEETS_CACHE_TTL_MS) || 30 * 1000;
+// Si Google falla de forma transitoria (cuota 429, 5xx, red), se sigue
+// sirviendo la última copia buena hasta este límite de antigüedad.
+const CACHE_STALE_MAX_MS = Number(process.env.SHEETS_CACHE_STALE_MAX_MS) || 10 * 60 * 1000;
+const REINTENTO_TRAS_ERROR_MS = 5 * 1000;
+
+const RANGOS = {
+  config: 'config!A1:E100',
+  inventario: 'INVENTARIO!A3:N',
+  ubicaciones: 'ubicaciones!A:C',
+};
+
+// sheetId -> { gen, datos, cargadoEn, expira, promesa }
+const _cache = new Map();
+
+function esErrorDeAcceso(err) {
+  const msg = (err && err.message) || '';
+  return msg.includes('Requested entity was not found') || msg.includes('permission') || msg.includes('unregistered');
+}
+
+/** Lee las tres hojas de un laboratorio en una sola llamada a la API */
+async function leerLab(sheetId) {
+  const { sheets } = getApis();
+  if (!sheets) throw new Error("Google APIs no inicializadas");
+
+  const claves = Object.keys(RANGOS);
+  try {
+    const res = await sheets.spreadsheets.values.batchGet({
+      spreadsheetId: sheetId,
+      ranges: claves.map(k => RANGOS[k]),
+    });
+    const datos = { errores: {} };
+    claves.forEach((k, i) => { datos[k] = res.data.valueRanges[i].values || []; });
+    return datos;
+  } catch (err) {
+    // Si falta alguna hoja, batchGet falla entero. En ese caso se leen por
+    // separado para que las demás sigan funcionando como antes.
+    if (!/Unable to parse range/i.test(err.message || '')) throw err;
+    const resultados = await Promise.allSettled(
+      claves.map(k => sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: RANGOS[k] }))
+    );
+    const datos = { errores: {} };
+    claves.forEach((k, i) => {
+      const r = resultados[i];
+      if (r.status === 'fulfilled') datos[k] = r.value.data.values || [];
+      else { datos[k] = null; datos.errores[k] = r.reason; }
+    });
+    return datos;
+  }
+}
+
+/** Devuelve los datos del laboratorio desde caché, o los lee si vencieron */
+function cargarLab(sheetId) {
+  let e = _cache.get(sheetId);
+  if (e && e.datos && e.expira > Date.now()) return Promise.resolve(e.datos);
+  if (e && e.promesa) return e.promesa; // ya hay una lectura en curso: se comparte
+
+  if (!e) { e = { gen: 0 }; _cache.set(sheetId, e); }
+  const gen = e.gen;
+
+  const promesa = leerLab(sheetId).then(
+    datos => {
+      const actual = _cache.get(sheetId);
+      // Solo se guarda si no hubo una escritura (invalidación) mientras se leía
+      if (actual && actual.gen === gen) {
+        actual.datos = datos;
+        actual.cargadoEn = Date.now();
+        actual.expira = actual.cargadoEn + CACHE_TTL_MS;
+        actual.promesa = null;
+      }
+      return datos;
+    },
+    err => {
+      const actual = _cache.get(sheetId);
+      if (actual && actual.promesa === promesa) actual.promesa = null;
+      // Error transitorio con copia previa reciente: servir la copia
+      if (actual && actual.datos && !esErrorDeAcceso(err) &&
+          Date.now() - actual.cargadoEn < CACHE_STALE_MAX_MS) {
+        console.warn(`[cache] Error leyendo ${sheetId}, se sirve copia previa: ${err.message}`);
+        actual.expira = Date.now() + REINTENTO_TRAS_ERROR_MS;
+        return actual.datos;
+      }
+      throw err;
+    }
+  );
+  e.promesa = promesa;
+  return promesa;
+}
+
+/** Descarta la caché de un laboratorio (se llama después de cada escritura) */
+function invalidarLab(sheetId) {
+  const e = _cache.get(sheetId);
+  _cache.set(sheetId, { gen: (e ? e.gen : 0) + 1 });
+}
+
+/** Devuelve una hoja de los datos cargados, o lanza el error con que falló */
+function hoja(datos, clave) {
+  if (datos[clave] === null) throw datos.errores[clave];
+  return datos[clave];
+}
+
+// Limpieza periódica de laboratorios que nadie consulta hace rato
+setInterval(() => {
+  const limite = Date.now() - CACHE_STALE_MAX_MS;
+  for (const [id, e] of _cache) {
+    if (!e.promesa && (!e.cargadoEn || e.cargadoEn < limite)) _cache.delete(id);
+  }
+}, 5 * 60 * 1000).unref();
 
 // ─── LECTURA ──────────────────────────────────────────
 
 /** Lee los parámetros institucionales y del laboratorio de la hoja 'config' */
 async function getAppConfig(sheetId) {
-  const { sheets } = getApis();
-  if (!sheets) throw new Error("Google APIs no inicializadas");
-  
   const config = {
     institucion: "Liceo Sauce 2",
     laboratorio: "Laboratorio de Física",
@@ -50,12 +167,7 @@ async function getAppConfig(sheetId) {
   };
 
   try {
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: 'config!A1:E100',
-    });
-    
-    const data = res.data.values || [];
+    const data = hoja(await cargarLab(sheetId), 'config');
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       if (row.length >= 5) { // Las claves en columna D (3), valores en E (4)
@@ -76,33 +188,25 @@ async function getAppConfig(sheetId) {
     }
   } catch (e) {
     console.error(`[getAppConfig] Error al leer config de ${sheetId}:`, e.message);
-    if (e.message.includes("Requested entity was not found") || e.message.includes("permission") || e.message.includes("unregistered")) {
-      throw new Error("ACCESO_DENEGADO");
-    }
+    if (e.message === "Google APIs no inicializadas") throw e;
+    if (esErrorDeAcceso(e)) throw new Error("ACCESO_DENEGADO");
   }
   return config;
 }
 
 /** Verifica si el email está en la columna A de 'config' y retorna el rol de la columna B */
 async function verificarPermisos(sheetId, email) {
-  // Las llamadas a verificarPermisos en el demo se bypassan en server.js, 
+  // Las llamadas a verificarPermisos en el demo se bypassan en server.js,
   // pero por si acaso, dejamos esta función intacta porque necesita sheetId.
   if (!email) return { autorizado: false, esAdmin: false };
-  
-  const { sheets } = getApis();
-  if (!sheets) throw new Error("Google APIs no inicializadas");
 
   try {
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: 'config!A2:B100',
-    });
-    
-    const data = res.data.values || [];
+    const data = hoja(await cargarLab(sheetId), 'config').slice(1); // equivale a config!A2:B100
+    const buscado = email.toLowerCase().trim();
     for (let i = 0; i < data.length; i++) {
       const mailFila = (data[i][0] || '').toString().toLowerCase().trim();
       const rolFila = (data[i][1] || '').toString().toUpperCase().trim();
-      if (mailFila === email.toLowerCase().trim()) {
+      if (mailFila === buscado) {
         return { autorizado: true, esAdmin: (rolFila === 'ADMIN') };
       }
     }
@@ -114,15 +218,7 @@ async function verificarPermisos(sheetId, email) {
 
 /** Devuelve las filas de inventario que pertenezcan a una zona específica */
 async function getFilasPorZona(sheetId, zona) {
-  const { sheets } = getApis();
-  if (!sheets) throw new Error("Google APIs no inicializadas");
-
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range: 'INVENTARIO!A3:N',
-  });
-  
-  const data = res.data.values || [];
+  const data = hoja(await cargarLab(sheetId), 'inventario');
   return data.map((r, i) => ({
     fila:      i + 3,
     articulo:  (r[0] || '').toString().trim(),
@@ -141,29 +237,24 @@ async function getFilasPorZona(sheetId, zona) {
 
 /** Realiza búsqueda global en el inventario por texto parcial */
 async function buscarEnInventario(sheetId, query) {
-  const { sheets } = getApis();
-  if (!sheets) throw new Error("Google APIs no inicializadas");
-
   try {
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: 'INVENTARIO!A3:N',
-    });
-    
-    const data = res.data.values || [];
+    const data = hoja(await cargarLab(sheetId), 'inventario');
     const q = query.toLowerCase().trim();
-    
-    return data.map((row, i) => { row._fIndex = i + 3; return row; })
-      .filter(row => (row[0] || '').toString().toLowerCase().includes(q))
-      .map(row => ({
-        articulo: row[0],
-        bien: row[2] || 0,
-        regular: row[3] || 0,
-        roto: row[4] || 0,
-        ubicacion: row[7],
-        foto: row[13],
-        fila: row._fIndex
-      }));
+    const resultados = [];
+    data.forEach((row, i) => {
+      if ((row[0] || '').toString().toLowerCase().includes(q)) {
+        resultados.push({
+          articulo: row[0],
+          bien: row[2] || 0,
+          regular: row[3] || 0,
+          roto: row[4] || 0,
+          ubicacion: row[7],
+          foto: row[13],
+          fila: i + 3
+        });
+      }
+    });
+    return resultados;
   } catch (err) {
     if (err.message.includes("unregistered callers") || err.message.includes("auth")) {
       throw new Error("No se pudo conectar a Google Sheets. Verifica que las credenciales de la cuenta de servicio estén correctamente configuradas en el servidor y que la planilla esté compartida con la cuenta de servicio.");
@@ -177,15 +268,9 @@ async function buscarEnInventario(sheetId, query) {
 
 /** Devuelve la lista de zonas desde la hoja ubicaciones */
 async function obtenerZonasAdmin(sheetId) {
-  const { sheets } = getApis();
-  if (!sheets) throw new Error("Google APIs no inicializadas");
-
   try {
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: 'ubicaciones!A2:C',
-    });
-    return res.data.values || [];
+    // equivale a ubicaciones!A2:C; se copian las filas para no tocar la caché
+    return hoja(await cargarLab(sheetId), 'ubicaciones').slice(1).map(r => r.slice());
   } catch (e) {
     console.error(`[obtenerZonasAdmin] Error:`, e.message);
     return [];
@@ -664,16 +749,28 @@ async function ejecutarGeneracionQR(sheetId, baseUrl, listaIds = []) {
   return `Proceso completado. Se generaron ${dataMaestra.length} etiquetas en IMPRIMIR_QR.`;
 }
 
+/** Envuelve una escritura para que, termine bien o mal, invalide la caché del laboratorio */
+function conInvalidacion(fn) {
+  return async (sheetId, ...args) => {
+    try {
+      return await fn(sheetId, ...args);
+    } finally {
+      invalidarLab(sheetId);
+    }
+  };
+}
+
 module.exports = {
   getAppConfig,
   verificarPermisos,
   getFilasPorZona,
   buscarEnInventario,
   obtenerZonasAdmin,
-  subirFoto,
-  registrarReporte,
-  cambiarUbicacion,
-  guardarZona,
-  eliminarZona,
-  ejecutarGeneracionQR
+  subirFoto: conInvalidacion(subirFoto),
+  registrarReporte: conInvalidacion(registrarReporte),
+  cambiarUbicacion: conInvalidacion(cambiarUbicacion),
+  guardarZona: conInvalidacion(guardarZona),
+  eliminarZona: conInvalidacion(eliminarZona),
+  ejecutarGeneracionQR,
+  invalidarLab
 };
