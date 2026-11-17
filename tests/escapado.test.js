@@ -14,8 +14,8 @@ const stub = () => new Proxy(function () {}, { get: (t, k) => k === Symbol.toPri
 const navegador = () => vm.createContext({ document: stub(), window: stub(), history: stub(), navigator: stub(), localStorage: stub(), location: stub(), setTimeout() {}, console });
 
 const X = `<img src=x onerror=alert(1)>'"</script><script>alert(2)</script>`;
-const fila = { fila: 7, articulo: 'Probeta ' + X, bien: 2, regular: '1' + X, roto: 0, total: 3, obs: 'obs ' + X,
-  historial: '[17/11/26] (a@b) ' + X + '\nviejo', foto: 'javascript:alert(3)', zona: "Z1');alert(4);('" };
+const fila = { id: 'A0007', fila: 7, articulo: 'Probeta ' + X, bien: 2, regular: '1' + X, roto: 0, total: 3, obs: 'obs ' + X,
+  ultimo: '[17/11/26] (a@b) ' + X, foto: 'javascript:alert(3)', zona: "Z1');alert(4);('" };
 const config = { laboratorio: 'Lab', institucion: 'Liceo', esAdmin: true, autorizado: true, puedeReportar: true, email: 'yo@x', zonasAdmin: ['Z1', X] };
 
 function cargarArmario(cfg) {
@@ -34,7 +34,9 @@ test('armario: los datos se muestran como texto', () => {
   assert.ok(!/<img src=x/i.test(out) && !/<script>/i.test(out), 'sin etiquetas inyectadas');
   assert.ok(out.includes('Probeta &lt;img src=x onerror=alert(1)&gt;&#39;&quot;&lt;/script&gt;'));
   assert.ok(!out.includes('javascript:'), 'foto con URL no https descartada');
-  assert.ok(out.includes(`data-zona='Z1&#39;);alert(4);(&#39;'`) && out.includes('abrirModalMover(7, this.dataset.zona)'));
+  assert.ok(out.includes(`data-zona='Z1&#39;);alert(4);(&#39;'`) && out.includes('abrirModalMover(this)'));
+  assert.ok(out.includes("id='item-A0007' data-id='A0007'"), 'el artículo se identifica por su ID');
+  assert.ok(out.includes('(a@b) &lt;img'), 'el último evento también se escapa');
   assert.equal(vm.runInContext('DATA[0].articulo', ctx), fila.articulo, 'los datos llegan intactos al JS');
   const conFoto = vm.runInContext(`render(Object.assign({}, DATA[0], {foto:'https://lh3.googleusercontent.com/d/abc'}))`, ctx);
   assert.ok(conFoto.includes("data-src='https://lh3.googleusercontent.com/d/abc'"));
@@ -46,6 +48,15 @@ test('armario: formulario de reporte según el rol', () => {
   const lector = render({ autorizado: true, puedeReportar: true });
   assert.ok(lector.includes('rep-input') && !lector.includes('disabled'), 'LECTOR: formulario activo');
   assert.ok(render({ autorizado: false, puedeReportar: false }).includes('disabled'), 'invitado: deshabilitado');
+});
+
+test('armario: sin ID no se ofrecen escrituras, y un ID raro se escapa', () => {
+  const { ctx } = cargarArmario(config);
+  const sinId = vm.runInContext('render(Object.assign({}, DATA[0], { id: "" }))', ctx);
+  assert.ok(!sinId.includes('btn-foto') && !sinId.includes('Mover') && sinId.includes('aún no tiene ID'));
+  assert.ok(sinId.includes("id='item-fila7'"), 'se puede enlazar por fila mientras no tenga ID');
+  const raro = vm.runInContext(`render(Object.assign({}, DATA[0], { id: "x' onmouseover='alert(5)" }))`, ctx);
+  assert.ok(!raro.includes("' onmouseover='") && raro.includes('x&#39; onmouseover=&#39;alert(5)'));
 });
 
 test('dashboard: esc() y scripts válidos', () => {

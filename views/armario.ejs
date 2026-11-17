@@ -244,28 +244,30 @@ window.addEventListener("popstate", function() {
 
 function render(f) {
   if (!f.articulo) return "";
-  var fila = Number(f.fila);
+  // Los artículos se identifican por su ID (columna O), no por el número de fila
+  var id = String(f.id || "");
+  var clave = claveDe(f);
 
   var badges = (f.roto > 0 ? "<span class='badge roto'>🔴 Roto: " + esc(f.roto) + "</span>" : "") +
                (f.regular > 0 ? "<span class='badge reg'>🟡 Regular: " + esc(f.regular) + "</span>" : "") +
                (f.bien > 0 ? "<span class='badge bien'>🟢 Bien: " + esc(f.bien) + "</span>" : "") +
                "<span class='badge total'>📦 Total: " + esc(f.total) + "</span>";
 
-  var ultimo = f.historial ? f.historial.split("\\n")[0] : "";
+  var ultimo = f.ultimo || "";
 
   var btnFoto = "";
-  if (ADMIN) {
-    btnFoto = "<div class='upload-wrap'><input type='file' id='finput" + fila + "' accept='image/*' capture='environment' style='display:none' onchange='procesarArchivo(this," + fila + ")'><button class='rep-btn' id='btn-foto-" + fila + "' onclick='abrirSelector(" + fila + ")'>📸 Foto</button><span id='msg-foto-" + fila + "' class='msg'></span></div>";
+  if (ADMIN && id) {
+    btnFoto = "<div class='upload-wrap'><input type='file' class='finput' accept='image/*' capture='environment' style='display:none' onchange='procesarArchivo(this)'><button class='rep-btn btn-foto' onclick='abrirSelector(this)'>📸 Foto</button><span class='msg msg-foto'></span></div>";
   }
 
   var btnMover = "";
-  if (ADMIN) {
+  if (ADMIN && id) {
     // La zona viaja en un atributo data-* en vez de dentro del código del onclick
-    btnMover = "<button class='rep-btn' style='background:#d35400;' data-zona='" + esc(f.zona) + "' onclick='abrirModalMover(" + fila + ", this.dataset.zona)'>🚚 Mover</button>";
+    btnMover = "<button class='rep-btn' style='background:#d35400;' data-zona='" + esc(f.zona) + "' onclick='abrirModalMover(this)'>🚚 Mover</button>";
   }
 
   var foto = urlSegura(f.foto);
-  var html = "<div class='item' id='item-" + fila + "'>";
+  var html = "<div class='item' id='item-" + esc(clave) + "' data-id='" + esc(id) + "'>";
   html += "<div class='art'>" + esc(f.articulo) + "</div>";
   html += "<div class='badges'>" + badges + "</div>";
   if (f.obs) html += "<div class='obs'>📝 " + esc(f.obs) + "</div>";
@@ -276,8 +278,11 @@ function render(f) {
   if (AUTORIZADO && !PUEDE_REPORTAR) {
     // Rol VISOR: solo lectura, sin formulario de reporte
     if (btnMover) html += "<div style='display:flex; gap:6px;'>" + btnMover + "</div>";
+  } else if (AUTORIZADO && !id) {
+    // Todavía sin ID (la planilla no se pudo preparar): no se puede escribir
+    html += "<input class='rep-input' placeholder='Este artículo aún no tiene ID; recargá en unos minutos.' disabled>";
   } else if (AUTORIZADO) {
-    html += "<input class='rep-input' data-fila='" + fila + "' placeholder='Describí el problema...'>";
+    html += "<input class='rep-input' placeholder='Describí el problema...'>";
     html += "<div style='display:flex; gap:6px;'>" + "<button class='rep-btn' onclick='enviar(this)'>Reportar</button>" + btnMover + "</div>";
   } else {
     html += "<input class='rep-input' placeholder='Inicia sesión para reportar...' disabled>";
@@ -288,11 +293,16 @@ function render(f) {
   return html;
 }
 
-let filaSeleccionadaMover = null;
+// Clave del elemento en la página (y en los enlaces #item-...): el ID, o la fila si aún no tiene
+function claveDe(f) { return f.id ? String(f.id) : "fila" + Number(f.fila); }
+function itemDe(el) { return el.closest(".item"); }
 
-function abrirModalMover(fila, zonaActual) {
-  filaSeleccionadaMover = fila;
-  var el = document.getElementById("item-" + fila);
+let itemSeleccionadoMover = null;
+
+function abrirModalMover(btn) {
+  var el = itemDe(btn);
+  var zonaActual = btn.dataset.zona;
+  itemSeleccionadoMover = el;
   var nombreArt = el ? el.querySelector('.art').innerText : "Articulo";
   document.getElementById('modalMoverTitle').innerText = "Mover: " + nombreArt;
   document.getElementById('zonaActualTexto').innerText = zonaActual;
@@ -321,15 +331,14 @@ async function confirmarMovimiento(btn) {
     const res = await fetch(`/inventariolab/lab/${LAB_ID}/api/mover`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fila: filaSeleccionadaMover, nuevaZona })
+      body: JSON.stringify({ id: itemSeleccionadoMover.dataset.id, nuevaZona })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Error desconocido');
     
     alert("Movido exitosamente a: " + nuevaZona);
     cerrarModalMover();
-    let el = document.getElementById("item-" + filaSeleccionadaMover);
-    if (el) el.style.opacity = "0.3";
+    if (itemSeleccionadoMover) itemSeleccionadoMover.style.opacity = "0.3";
     btn.innerText = "Mover";
     btn.disabled = false;
   } catch (err) {
@@ -338,10 +347,11 @@ async function confirmarMovimiento(btn) {
   }
 }
 
-function procesarArchivo(input, fila) {
+function procesarArchivo(input) {
   var file = input.files[0];
   if (!file || file.size > 8 * 1024 * 1024) return;
-  var btnFoto = document.getElementById("btn-foto-" + fila);
+  var item = itemDe(input);
+  var btnFoto = item.querySelector(".btn-foto");
   btnFoto.disabled = true; btnFoto.innerText = "Procesando...";
   var reader = new FileReader();
   reader.onload = function(e) {
@@ -357,13 +367,12 @@ function procesarArchivo(input, fila) {
           const res = await fetch(`/inventariolab/lab/${LAB_ID}/api/foto`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fila, base64: canvas.toDataURL("image/jpeg", 0.7), nombreArchivo: file.name })
+            body: JSON.stringify({ id: item.dataset.id, base64: canvas.toDataURL("image/jpeg", 0.7), nombreArchivo: file.name })
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Error de servidor');
           
           btnFoto.innerText = "✅ Subida"; btnFoto.disabled = false;
-          var item = document.getElementById("finput" + fila).closest(".item");
           var thumb = item.querySelector(".thumb");
           if (thumb) { thumb.src = data.url; thumb.dataset.src = data.url; }
           else {
@@ -373,7 +382,7 @@ function procesarArchivo(input, fila) {
           }
         } catch (err) {
           btnFoto.innerText = "❌ Error"; btnFoto.disabled = false;
-          document.getElementById("msg-foto-" + fila).innerText = "Error: " + err.message;
+          item.querySelector(".msg-foto").innerText = "Error: " + err.message;
         }
       }, 50);
     };
@@ -383,7 +392,7 @@ function procesarArchivo(input, fila) {
 }
 
 async function enviar(btn) {
-  var inp = btn.previousElementSibling;
+  var inp = itemDe(btn).querySelector(".rep-input");
   var txt = inp.value.trim();
   if (txt.length < 5) return;
   btn.disabled = true; btn.innerText = "Enviando...";
@@ -392,7 +401,7 @@ async function enviar(btn) {
     const res = await fetch(`/inventariolab/lab/${LAB_ID}/api/reportar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fila: parseInt(inp.dataset.fila), texto: txt })
+      body: JSON.stringify({ id: itemDe(btn).dataset.id, texto: txt })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Error de servidor');
@@ -405,7 +414,7 @@ async function enviar(btn) {
   }
 }
 
-function abrirSelector(fila) { document.getElementById("finput" + fila).click(); }
+function abrirSelector(btn) { itemDe(btn).querySelector(".finput").click(); }
 
 // --- ARRANQUE CON FOCO DE BÚSQUEDA ---
 window.abrirConCarga = function(url) {
@@ -422,8 +431,8 @@ if ('serviceWorker' in navigator) {
 window.onload = function() {
   let hash = window.location.hash || ""; 
   if (hash.includes("item-")) {
-    let focoId = parseInt(hash.replace("#item-", ""));
-    let itemIndex = DATA.findIndex(d => d.fila === focoId);
+    let focoId = decodeURIComponent(hash.replace("#item-", ""));
+    let itemIndex = DATA.findIndex(d => claveDe(d) === focoId);
     if (itemIndex !== -1) {
       paginaActual = Math.floor(itemIndex / LIMIT);
     }

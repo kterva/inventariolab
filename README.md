@@ -23,9 +23,12 @@ Navegador ──► Cloudflare ──► nginx ──► Node.js/Express (PM2)
 | Hoja | Contenido |
 |---|---|
 | `config` | Columnas A/B: email y rol de cada usuario. Columnas D/E: parámetros clave/valor (`institucion`, `laboratorio`, `acceso publico`, `modo demo`, `demo rol`). |
-| `INVENTARIO` | Desde la fila 3: artículo (A), cantidades bien/regular/roto/total (C–F), observaciones (G), zona (H), fecha (I), historial (J), último reporte (K), foto (N). |
+| `INVENTARIO` | Desde la fila 3: artículo (A), cantidades bien/regular/roto/total (C–F), observaciones (G), zona (H), fecha (I), historial anterior (J, ya no lo escribe la app), último reporte (K), foto (N), **ID** (O). |
+| `HISTORIAL` | Una fila por cada cambio hecho desde la app: fecha, ID y nombre del artículo, usuario, acción (`REPORTE`, `MOVIDO`, `FOTO`) y detalle. |
 | `ubicaciones` | ID, nombre y descripción de cada zona/armario. |
 | `IMPRIMIR_QR` | La genera la app con las etiquetas QR de las zonas. |
+
+La primera vez que la app abre una planilla agrega lo que falte: la columna `ID` (O) de `INVENTARIO` con un ID fijo para cada artículo (`A0001`, `A0002`, …) y la hoja `HISTORIAL`. Los artículos nuevos cargados a mano reciben su ID en la próxima lectura (como mucho 30 s después), y una fila copiada y pegada recibe uno nuevo. La app escribe siempre por ID y no por número de fila, así que se puede ordenar, insertar o borrar filas sin que un cambio caiga en otro artículo. **No hay que editar ni borrar la columna `ID`:** la app la protege en modo "solo advertencia", así que quien tenga acceso a la planilla (los administradores) ve un aviso antes de modificarla, sin que se bloquee ordenar, insertar o borrar filas.
 
 ### Roles (columna B de `config`)
 
@@ -59,6 +62,7 @@ npm start              # o: npm run dev
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Cliente OAuth web para el login. |
 | `SHEETS_CACHE_TTL_MS` | Cuánto se reutiliza una lectura de la planilla (por defecto 30000). |
 | `SHEETS_CACHE_STALE_MAX_MS` | Si Google falla por cuota o red, hasta qué antigüedad se sirve la última copia buena (por defecto 600000). |
+| `GOOGLE_REINTENTOS`, `GOOGLE_BACKOFF_MS` | Reintentos de las escrituras ante 429/5xx o errores de red (por defecto 3, con espera inicial de 500 ms que se duplica en cada intento). Las lecturas ya las reintenta la librería `googleapis`. |
 
 ### Configurar Google Cloud
 
@@ -78,6 +82,7 @@ npm test
 No llaman a Google: `tests/fake-googleapis.js` simula la API.
 
 - `cache.test.js`: caché, invalidación, errores de Google y roles.
+- `escrituras.test.js`: IDs fijos, hoja `HISTORIAL`, escrituras tras reordenar filas, reportes simultáneos y reintentos.
 - `escapado.test.js`: renderiza las vistas con datos maliciosos y verifica que se muestren como texto.
 - `servidor.test.js`: levanta el servidor real y prueba cada rol (vía modo demo) y la persistencia de sesiones.
 
@@ -119,6 +124,13 @@ Las sesiones se guardan en archivos, así que reiniciar no cierra la sesión de 
   - migración a un proyecto propio de Google Cloud (cuenta de servicio y cliente OAuth nuevos);
   - el email de la cuenta de servicio se toma de la credencial configurada;
   - pruebas automatizadas con `npm test`.
+- **Escrituras robustas:**
+  - ID fijo por artículo (columna O) en lugar del número de fila;
+  - historial en la hoja `HISTORIAL`, una fila por evento, sin límite de tamaño ni escrituras que se pisen;
+  - reintentos con espera creciente ante 429/5xx;
+  - la carpeta `LAB_FOTOS` se busca una sola vez por planilla;
+  - las fechas se registran en hora de Uruguay aunque el servidor esté en UTC;
+  - corregido el botón "Reportar" del armario, que no encontraba el texto escrito.
 
 ### Versión 2.0 (Node.js + VPS)
 Reescritura sobre **Node.js + Express** para resolver los límites de velocidad y concurrencia de Apps Script, manteniendo Google Sheets como base de datos. Login con Google OAuth y roles; PWA instalable en Android e iOS.
@@ -128,7 +140,4 @@ Desarrollada 100 % sobre Google Apps Script, que servía el HTML y usaba la plan
 
 ## Pendientes conocidos
 
-- Las escrituras identifican los artículos por **número de fila**: si alguien ordena o inserta filas en la planilla mientras otra persona trabaja en la app, un cambio puede ir al artículo equivocado. Conviene un ID fijo por artículo.
-- El historial se guarda en una sola celda (columna J), que admite como máximo 50.000 caracteres, y dos escrituras simultáneas pueden pisarse. Conviene una hoja `HISTORIAL` donde cada entrada sea una fila nueva.
-- No hay reintentos automáticos ante errores 429/5xx de Google en las escrituras.
-- La carpeta `LAB_FOTOS` se busca en Drive en cada subida de foto.
+- La vista del armario muestra el último evento de `HISTORIAL`; las ediciones hechas a mano en la planilla siguen yendo a la columna J (si la planilla tiene el script de Apps Script) y solo se muestran cuando el artículo no tiene eventos en `HISTORIAL`.

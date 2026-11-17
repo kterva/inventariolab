@@ -51,11 +51,52 @@ const CACHE_TTL_MS = Number(process.env.SHEETS_CACHE_TTL_MS) || 30 * 1000;
 const CACHE_STALE_MAX_MS = Number(process.env.SHEETS_CACHE_STALE_MAX_MS) || 10 * 60 * 1000;
 const REINTENTO_TRAS_ERROR_MS = 5 * 1000;
 
+// La hoja INVENTARIO se lee desde la fila 2 (encabezados) para poder ver si
+// ya existe la columna ID. Si la grilla tiene menos columnas que O, Google
+// recorta el rango sin dar error.
 const RANGOS = {
   config: 'config!A1:E100',
-  inventario: 'INVENTARIO!A3:N',
+  inventario: 'INVENTARIO!A2:O',
   ubicaciones: 'ubicaciones!A:C',
+  historial: 'HISTORIAL!A2:F',
 };
+
+// Columnas de INVENTARIO (índice 0 = columna A)
+const COL = { ART: 0, BIEN: 2, REG: 3, ROTO: 4, TOTAL: 5, OBS: 6, ZONA: 7, FECHA: 8, LOG: 9, REP: 10, FOTO: 13, ID: 14 };
+const LETRA = i => String.fromCharCode(65 + i);
+const PRIMERA_FILA = 3; // la fila 1 es el título y la 2 los encabezados
+
+const HOJA_HISTORIAL = 'HISTORIAL';
+const ENCABEZADOS_HISTORIAL = ['Fecha', 'ID', 'Artículo', 'Usuario', 'Acción', 'Detalle'];
+
+// ─── REINTENTOS ───────────────────────────────────────
+// googleapis ya reintenta por su cuenta los GET y PUT (lecturas y
+// values.update) ante 429/5xx, pero no los POST: values.batchUpdate,
+// values.append, spreadsheets.batchUpdate y las subidas a Drive. Esas
+// llamadas pasan por conReintentos().
+const REINTENTOS = process.env.GOOGLE_REINTENTOS !== undefined ? Number(process.env.GOOGLE_REINTENTOS) : 3;
+const BACKOFF_MS = Number(process.env.GOOGLE_BACKOFF_MS) || 500;
+const CODIGOS_RED = ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ECONNREFUSED', 'EPIPE', 'ENETUNREACH'];
+
+function esTransitorio(err) {
+  const estado = Number((err && (err.status || (err.response && err.response.status))) || err && err.code);
+  if ([408, 429, 500, 502, 503, 504].includes(estado)) return true;
+  if (err && CODIGOS_RED.includes(err.code)) return true;
+  return /quota exceeded|rate limit|backend error|internal error|service unavailable|\b(429|5\d\d)\b/i.test((err && err.message) || '');
+}
+
+async function conReintentos(fn, etiqueta = 'llamada a Google') {
+  for (let intento = 0; ; intento++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (intento >= REINTENTOS || !esTransitorio(err)) throw err;
+      const ms = Math.round(BACKOFF_MS * 2 ** intento * (0.5 + Math.random()));
+      console.warn(`[reintento] ${etiqueta} falló (${err.message}); intento ${intento + 2} en ${ms} ms`);
+      await new Promise(r => setTimeout(r, ms));
+    }
+  }
+}
 
 // sheetId -> { gen, datos, cargadoEn, expira, promesa }
 const _cache = new Map();
@@ -71,14 +112,14 @@ async function leerLab(sheetId) {
   if (!sheets) throw new Error("Google APIs no inicializadas");
 
   const claves = Object.keys(RANGOS);
+  let datos;
   try {
     const res = await sheets.spreadsheets.values.batchGet({
       spreadsheetId: sheetId,
       ranges: claves.map(k => RANGOS[k]),
     });
-    const datos = { errores: {} };
+    datos = { errores: {} };
     claves.forEach((k, i) => { datos[k] = res.data.valueRanges[i].values || []; });
-    return datos;
   } catch (err) {
     // Si falta alguna hoja, batchGet falla entero. En ese caso se leen por
     // separado para que las demás sigan funcionando como antes.
@@ -86,14 +127,167 @@ async function leerLab(sheetId) {
     const resultados = await Promise.allSettled(
       claves.map(k => sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: RANGOS[k] }))
     );
-    const datos = { errores: {} };
+    datos = { errores: {} };
     claves.forEach((k, i) => {
       const r = resultados[i];
       if (r.status === 'fulfilled') datos[k] = r.value.data.values || [];
       else { datos[k] = null; datos.errores[k] = r.reason; }
     });
-    return datos;
   }
+
+  // La primera vez que se abre un laboratorio se crean la columna ID, los
+  // IDs que falten y la hoja HISTORIAL. Si no se puede (p. ej. la cuenta de
+  // servicio solo tiene permiso de lectura) la app sigue funcionando para leer.
+  try {
+    await prepararLab(sheetId, datos);
+  } catch (err) {
+    console.error(`[prepararLab] ${sheetId}: ${err.message}`);
+  }
+  return datos;
+}
+
+// ─── ID FIJO POR ARTÍCULO E HISTORIAL ─────────────────
+// Cada artículo tiene un ID en la columna O de INVENTARIO ("A0001", ...).
+// Las escrituras se hacen por ID y no por número de fila, así que ordenar,
+// insertar o borrar filas en la planilla no hace que un cambio caiga en otro
+// artículo. Los eventos de la app se agregan a la hoja HISTORIAL con
+// values.append, que nunca pisa lo que escribió otro.
+
+// Al menos una letra: así un número de fila nunca se confunde con un ID
+const ID_VALIDO = /^(?=.*[A-Za-z])[A-Za-z0-9_-]{1,40}$/;
+
+/**
+ * Recorre INVENTARIO (leído desde la fila 2) y devuelve los IDs a asignar:
+ * filas con artículo y sin ID, con un ID inválido o repetido (fila copiada
+ * y pegada: conserva el ID la primera aparición).
+ */
+function calcularIdsFaltantes(inv) {
+  const vistos = new Set();
+  const faltan = [];
+  let max = 0;
+  for (let k = 1; k < inv.length; k++) {
+    const row = inv[k] || [];
+    if (!(row[COL.ART] || '').toString().trim()) continue;
+    const id = (row[COL.ID] || '').toString().trim();
+    if (ID_VALIDO.test(id) && !vistos.has(id)) {
+      vistos.add(id);
+      const m = /^A(\d+)$/.exec(id);
+      if (m) max = Math.max(max, Number(m[1]));
+    } else {
+      faltan.push(k);
+    }
+  }
+  return faltan.map(k => {
+    let id;
+    do { id = 'A' + String(++max).padStart(4, '0'); } while (vistos.has(id));
+    vistos.add(id);
+    return { k, fila: k + 2, id };
+  });
+}
+
+// La columna ID se protege con "solo advertencia": quien puede editar la
+// planilla (los administradores) ve un aviso antes de tocar un ID, pero nada
+// se bloquea (ni la app, ni ordenar o insertar filas).
+const DESC_PROTECCION_ID = 'InventarioLab: IDs de artículos (no editar)';
+
+// Laboratorios cuya protección de la columna ID ya se verificó en este proceso
+const _protegidos = new Set();
+
+function necesitaPreparacion(sheetId, datos) {
+  const inv = datos.inventario;
+  if (!inv) return false; // sin hoja INVENTARIO no hay nada que preparar
+  const enc = ((inv[0] || [])[COL.ID] || '').toString().trim();
+  if (enc && enc.toUpperCase() !== 'ID') return false; // columna O ocupada: ver ubicarArticulo
+  return datos.historial === null || enc.toUpperCase() !== 'ID' || !_protegidos.has(sheetId) ||
+    calcularIdsFaltantes(inv).length > 0;
+}
+
+// sheetId -> promesa de la preparación en curso (una a la vez por laboratorio)
+const _preparando = new Map();
+// sheetId -> momento del último fallo (para no reintentar en cada lectura)
+const _prepFallida = new Map();
+const ESPERA_TRAS_FALLO_PREP_MS = 10 * 60 * 1000;
+
+async function prepararLab(sheetId, datos) {
+  if (!necesitaPreparacion(sheetId, datos)) return;
+  if (Date.now() - (_prepFallida.get(sheetId) || 0) < ESPERA_TRAS_FALLO_PREP_MS) return;
+  const previa = _preparando.get(sheetId) || Promise.resolve();
+  const actual = previa.catch(() => {}).then(() => ejecutarPreparacion(sheetId, datos));
+  _preparando.set(sheetId, actual);
+  try {
+    await actual;
+    _prepFallida.delete(sheetId);
+  } catch (err) {
+    _prepFallida.set(sheetId, Date.now());
+    throw err;
+  } finally {
+    if (_preparando.get(sheetId) === actual) _preparando.delete(sheetId);
+  }
+}
+
+async function ejecutarPreparacion(sheetId, datos) {
+  const { sheets } = getApis();
+
+  // Se vuelve a leer en el momento, por si otra preparación o una edición a
+  // mano cambió algo desde la lectura que trajo `datos`.
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId: sheetId,
+    fields: 'sheets(properties(title,sheetId,gridProperties.columnCount),protectedRanges(description))',
+  });
+  const props = meta.data.sheets.map(s => s.properties);
+  const pInv = props.find(p => p.title === 'INVENTARIO');
+  const protegida = meta.data.sheets.some(s => (s.protectedRanges || []).some(r => r.description === DESC_PROTECCION_ID));
+  if (!pInv) return;
+  const fresca = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: RANGOS.inventario });
+  const inv = fresca.data.values || [];
+  const enc = ((inv[0] || [])[COL.ID] || '').toString().trim();
+  if (enc && enc.toUpperCase() !== 'ID') {
+    console.warn(`[prepararLab] ${sheetId}: la columna ${LETRA(COL.ID)} de INVENTARIO tiene otro encabezado ("${enc}"); no se asignan IDs.`);
+    datos.inventario = inv;
+    return;
+  }
+
+  // 1. Estructura: hoja HISTORIAL y una columna más en INVENTARIO si hace falta
+  const pedidos = [];
+  const faltaHistorial = !props.some(p => p.title === HOJA_HISTORIAL);
+  if (faltaHistorial) pedidos.push({ addSheet: { properties: { title: HOJA_HISTORIAL, gridProperties: { frozenRowCount: 1 } } } });
+  if (pInv.gridProperties.columnCount < COL.ID + 1) {
+    pedidos.push({ appendDimension: { sheetId: pInv.sheetId, dimension: 'COLUMNS', length: COL.ID + 1 - pInv.gridProperties.columnCount } });
+  }
+  if (!protegida) {
+    pedidos.push({ addProtectedRange: { protectedRange: {
+      description: DESC_PROTECCION_ID,
+      warningOnly: true,
+      range: { sheetId: pInv.sheetId, startRowIndex: 1, startColumnIndex: COL.ID, endColumnIndex: COL.ID + 1 },
+    } } });
+  }
+  if (pedidos.length) {
+    await conReintentos(() => sheets.spreadsheets.batchUpdate({ spreadsheetId: sheetId, requestBody: { requests: pedidos } }), 'preparar estructura');
+  }
+
+  // 2. Valores: encabezados e IDs faltantes, en una sola escritura
+  const asignar = calcularIdsFaltantes(inv);
+  const data = asignar.map(a => ({ range: `INVENTARIO!${LETRA(COL.ID)}${a.fila}`, values: [[a.id]] }));
+  if (enc.toUpperCase() !== 'ID') data.push({ range: `INVENTARIO!${LETRA(COL.ID)}2`, values: [['ID']] });
+  if (faltaHistorial) data.push({ range: `${HOJA_HISTORIAL}!A1:F1`, values: [ENCABEZADOS_HISTORIAL] });
+  if (data.length) {
+    await conReintentos(() => sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: sheetId, requestBody: { valueInputOption: 'RAW', data },
+    }), 'asignar IDs');
+  }
+  if (asignar.length) console.log(`[prepararLab] ${sheetId}: ${asignar.length} IDs asignados`);
+
+  // 3. Los datos que se van a cachear reflejan lo que quedó en la planilla
+  if (!inv[0]) inv[0] = [];
+  inv[0][COL.ID] = 'ID';
+  for (const a of asignar) {
+    const row = inv[a.k];
+    while (row.length < COL.ID) row.push('');
+    row[COL.ID] = a.id;
+  }
+  datos.inventario = inv;
+  if (datos.historial === null) { datos.historial = []; delete datos.errores.historial; }
+  _protegidos.add(sheetId);
 }
 
 /** Devuelve los datos del laboratorio desde caché, o los lee si vencieron */
@@ -226,21 +420,53 @@ async function verificarPermisos(sheetId, email) {
   return { ...SIN_PERMISOS };
 }
 
+/** Filas de datos de INVENTARIO (sin título ni encabezados), con su número de fila */
+function filasDeDatos(datos) {
+  return hoja(datos, 'inventario').slice(1).map((row, i) => ({ row, fila: i + PRIMERA_FILA }));
+}
+
+/** ID de una fila, o '' si no tiene uno válido todavía */
+function idDeFila(row) {
+  const id = (row[COL.ID] || '').toString().trim();
+  return ID_VALIDO.test(id) ? id : '';
+}
+
+/**
+ * Última entrada de la hoja HISTORIAL por ID de artículo. Las filas se
+ * agregan al final, así que la última que aparece es la más reciente.
+ */
+function ultimosEventos(datos) {
+  const ultimos = new Map();
+  for (const r of datos.historial || []) {
+    const id = (r[1] || '').toString().trim();
+    if (id) ultimos.set(id, `[${r[0] || ''}] (${r[3] || ''}) ${r[5] || r[4] || ''}`.trim());
+  }
+  return ultimos;
+}
+
 /** Devuelve las filas de inventario que pertenezcan a una zona específica */
 async function getFilasPorZona(sheetId, zona) {
-  const data = hoja(await cargarLab(sheetId), 'inventario');
-  return data.map((r, i) => ({
-    fila:      i + 3,
-    articulo:  (r[0] || '').toString().trim(),
-    bien:      r[2] || 0,
-    regular:   r[3] || 0,
-    roto:      r[4] || 0,
-    total:     r[5] || 0,
-    obs:       r[6] || '',
-    historial: (r[9] || '').toString(),
-    foto:      (r[13] || '').toString(),
-    zona:      (r[7] || '').toString().trim()
-  }))
+  const datos = await cargarLab(sheetId);
+  const eventos = ultimosEventos(datos);
+  return filasDeDatos(datos).map(({ row: r, fila }) => {
+    const id = idDeFila(r);
+    // Lo más reciente de la app está en HISTORIAL; si no hay nada, se muestra
+    // la primera línea del historial viejo de la columna J (más nuevo arriba).
+    const historialViejo = (r[COL.LOG] || '').toString().split('\n')[0];
+    return {
+      id,
+      fila,
+      articulo:  (r[COL.ART] || '').toString().trim(),
+      bien:      r[COL.BIEN] || 0,
+      regular:   r[COL.REG] || 0,
+      roto:      r[COL.ROTO] || 0,
+      total:     r[COL.TOTAL] || 0,
+      obs:       r[COL.OBS] || '',
+      ultimo:    (id && eventos.get(id)) || historialViejo,
+      foto:      (r[COL.FOTO] || '').toString(),
+      zona:      (r[COL.ZONA] || '').toString().trim()
+    };
+  })
   .filter(f => f.zona === zona && f.articulo)
   .sort((a, b) => a.articulo.localeCompare(b.articulo, 'es', { sensitivity: 'base', numeric: true }));
 }
@@ -248,19 +474,20 @@ async function getFilasPorZona(sheetId, zona) {
 /** Realiza búsqueda global en el inventario por texto parcial */
 async function buscarEnInventario(sheetId, query) {
   try {
-    const data = hoja(await cargarLab(sheetId), 'inventario');
+    const datos = await cargarLab(sheetId);
     const q = query.toLowerCase().trim();
     const resultados = [];
-    data.forEach((row, i) => {
-      if ((row[0] || '').toString().toLowerCase().includes(q)) {
+    filasDeDatos(datos).forEach(({ row, fila }) => {
+      if ((row[COL.ART] || '').toString().toLowerCase().includes(q)) {
         resultados.push({
-          articulo: row[0],
-          bien: row[2] || 0,
-          regular: row[3] || 0,
-          roto: row[4] || 0,
-          ubicacion: row[7],
-          foto: row[13],
-          fila: i + 3
+          id: idDeFila(row),
+          articulo: row[COL.ART],
+          bien: row[COL.BIEN] || 0,
+          regular: row[COL.REG] || 0,
+          roto: row[COL.ROTO] || 0,
+          ubicacion: row[COL.ZONA],
+          foto: row[COL.FOTO],
+          fila
         });
       }
     });
@@ -289,190 +516,212 @@ async function obtenerZonasAdmin(sheetId) {
 
 // ─── ESCRITURA (CRUD) ─────────────────────────────────
 
-const COL_ZONA = 8; // H
-const COL_REP = 11; // K
-const COL_FECHA = 9; // I
-const COL_LOG = 10; // J
-const COL_FOTO = 14; // N
-
-/** Función de utilidad para formatear la fecha como dd/MM/yy HH:mm en la zona local */
-function getFormattedDate() {
-  const now = new Date();
-  const d = now.getDate().toString().padStart(2, '0');
-  const m = (now.getMonth() + 1).toString().padStart(2, '0');
-  const y = now.getFullYear().toString().substr(-2);
-  const h = now.getHours().toString().padStart(2, '0');
-  const min = now.getMinutes().toString().padStart(2, '0');
-  return `${d}/${m}/${y} ${h}:${min}`;
+/** Fecha como dd/MM/yy HH:mm en hora de Uruguay (el servidor puede estar en UTC) */
+function getFormattedDate(fecha = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('es-UY', {
+    timeZone: 'America/Montevideo', day: '2-digit', month: '2-digit', year: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(fecha).map(x => [x.type, x.value]));
+  return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}`;
 }
 
-/** Sube una foto a Drive y actualiza el Inventario */
-async function subirFoto(sheetId, email, fila, base64Str, nombreArchivo) {
-  const { sheets, drive } = getApis();
-  if (!drive || !sheets) throw new Error("Google APIs no inicializadas");
+/**
+ * Busca un artículo por su ID leyendo la planilla en ese momento (no la
+ * caché), para escribir en la fila donde está ahora aunque se hayan
+ * ordenado, insertado o borrado filas desde que se cargó la página.
+ */
+async function ubicarArticulo(sheetId, id) {
+  const { sheets } = getApis();
+  if (!sheets) throw new Error("Google APIs no inicializadas");
+  const idBuscado = (id == null ? '' : id).toString().trim();
+  if (!ID_VALIDO.test(idBuscado)) {
+    throw new Error('Falta el ID del artículo. Recargá la página e intentá de nuevo.');
+  }
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: RANGOS.inventario });
+  const inv = res.data.values || [];
+  const enc = ((inv[0] || [])[COL.ID] || '').toString().trim();
+  if (enc.toUpperCase() !== 'ID') {
+    throw new Error(`La columna ${LETRA(COL.ID)} de INVENTARIO debe llamarse "ID" (los artículos se identifican por ella).`);
+  }
+  const encontrados = [];
+  for (let k = 1; k < inv.length; k++) {
+    if (((inv[k] || [])[COL.ID] || '').toString().trim() === idBuscado) encontrados.push(k);
+  }
+  if (encontrados.length === 0) {
+    throw new Error('El artículo ya no está en la planilla (¿se borró?). Recargá la página.');
+  }
+  if (encontrados.length > 1) {
+    throw new Error(`Hay ${encontrados.length} filas con el ID ${idBuscado} en la planilla; corregilo antes de seguir.`);
+  }
+  const row = inv[encontrados[0]];
+  return {
+    id: idBuscado,
+    fila: encontrados[0] + 2,
+    articulo: (row[COL.ART] || '').toString().trim(),
+    zona: (row[COL.ZONA] || '').toString().trim(),
+    foto: (row[COL.FOTO] || '').toString().trim(),
+  };
+}
+
+/** Escribe celdas de la fila de un artículo (valores por letra de columna) */
+async function escribirFila(sheetId, fila, celdas) {
+  const { sheets } = getApis();
+  try {
+    await conReintentos(() => sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: sheetId,
+      requestBody: {
+        valueInputOption: 'USER_ENTERED',
+        data: Object.entries(celdas).map(([col, v]) => ({ range: `INVENTARIO!${col}${fila}`, values: [[v]] })),
+      },
+    }), `escribir fila ${fila}`);
+  } catch (err) {
+    if (/protected cell/i.test(err.message || '')) {
+      console.error(`[escribirFila] ${sheetId}: rango protegido en las columnas ${Object.keys(celdas).join(', ')}`);
+      throw new Error('La planilla tiene un rango protegido que la aplicación no puede editar (columnas ' +
+        Object.keys(celdas).join(', ') + ' de INVENTARIO). El propietario tiene que agregar el email de la ' +
+        'cuenta de servicio como editor de esa protección (Datos → Proteger hojas y rangos).');
+    }
+    throw err;
+  }
+}
+
+/**
+ * Agrega un evento al final de la hoja HISTORIAL. RAW: lo que escribió el
+ * usuario se guarda como texto y nunca se interpreta como fórmula.
+ */
+async function registrarEvento(sheetId, art, email, accion, detalle, fecha) {
+  const { sheets } = getApis();
+  await conReintentos(() => sheets.spreadsheets.values.append({
+    spreadsheetId: sheetId,
+    range: `${HOJA_HISTORIAL}!A:F`,
+    valueInputOption: 'RAW',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: { values: [[fecha, art.id, art.articulo, email || '', accion, detalle]] },
+  }), 'agregar al historial');
+}
+
+// sheetId -> id de la carpeta LAB_FOTOS (no cambia; se vuelve a buscar si falla)
+const _carpetaFotos = new Map();
+
+/** Busca (o crea) la carpeta LAB_FOTOS junto a la planilla */
+async function carpetaFotos(sheetId) {
+  if (_carpetaFotos.has(sheetId)) return _carpetaFotos.get(sheetId);
+  const { drive } = getApis();
 
   // 1. Averiguar en qué carpeta está guardada la planilla
   let parentId = null;
   try {
-    const sheetFile = await drive.files.get({
-      fileId: sheetId,
-      fields: 'parents'
-    });
-    if (sheetFile.data.parents && sheetFile.data.parents.length > 0) {
-      parentId = sheetFile.data.parents[0];
-    }
+    const sheetFile = await drive.files.get({ fileId: sheetId, fields: 'parents' });
+    if (sheetFile.data.parents && sheetFile.data.parents.length > 0) parentId = sheetFile.data.parents[0];
   } catch (err) {
     console.log('No se pudo obtener el parentId de la planilla (puede estar en el root o falta permiso sobre la carpeta).', err.message);
   }
 
   // 2. Buscar o crear la carpeta LAB_FOTOS dentro de esa misma carpeta
-  let folderId;
   let q = "name = 'LAB_FOTOS' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
-  if (parentId) {
-    q += ` and '${parentId}' in parents`;
-  }
+  if (parentId) q += ` and '${parentId}' in parents`;
+  const folderQuery = await drive.files.list({ q, fields: 'files(id)', spaces: 'drive' });
 
-  const folderQuery = await drive.files.list({
-    q,
-    fields: 'files(id)',
-    spaces: 'drive',
-  });
-  
+  let folderId;
   if (folderQuery.data.files && folderQuery.data.files.length > 0) {
     folderId = folderQuery.data.files[0].id;
   } else {
     const requestBody = { name: 'LAB_FOTOS', mimeType: 'application/vnd.google-apps.folder' };
     if (parentId) requestBody.parents = [parentId];
-
-    const folderRes = await drive.files.create({
-      requestBody,
-      fields: 'id',
-    });
+    const folderRes = await conReintentos(() => drive.files.create({ requestBody, fields: 'id' }), 'crear LAB_FOTOS');
     folderId = folderRes.data.id;
   }
+  _carpetaFotos.set(sheetId, folderId);
+  return folderId;
+}
+
+/** Sube una foto a Drive y actualiza el Inventario */
+async function subirFoto(sheetId, email, id, base64Str, nombreArchivo) {
+  const { sheets, drive } = getApis();
+  if (!drive || !sheets) throw new Error("Google APIs no inicializadas");
+
+  const art = await ubicarArticulo(sheetId, id);
 
   // Decodificar Base64
-  const parts = base64Str.split(',');
+  const parts = (base64Str || '').split(',');
   const mimeMatch = parts[0].match(/:(.*?);/);
   const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-  const buffer = Buffer.from(parts[1], 'base64');
-  
-  const stream = require('stream');
-  const bufferStream = new stream.PassThrough();
-  bufferStream.end(buffer);
+  const buffer = Buffer.from(parts[1] || '', 'base64');
+  if (!buffer.length) throw new Error('La imagen llegó vacía.');
 
-  // Subir Archivo
-  const fileName = `img_fila${fila}_${Date.now()}.jpg`;
-  const fileRes = await drive.files.create({
-    requestBody: { name: fileName, parents: [folderId] },
-    media: { mimeType, body: bufferStream },
-    fields: 'id',
-  });
-  
+  const stream = require('stream');
+  const subir = async () => {
+    const folderId = await carpetaFotos(sheetId);
+    const body = new stream.PassThrough();
+    body.end(buffer); // un stream nuevo en cada intento
+    return drive.files.create({
+      requestBody: { name: `img_${art.id}_${Date.now()}.jpg`, parents: [folderId] },
+      media: { mimeType, body },
+      fields: 'id',
+    });
+  };
+
+  let fileRes;
+  try {
+    fileRes = await conReintentos(subir, 'subir foto');
+  } catch (err) {
+    // La carpeta guardada pudo haberse borrado: se busca de nuevo una vez
+    if (!_carpetaFotos.has(sheetId) || !/not found|404/i.test(err.message || '')) throw err;
+    _carpetaFotos.delete(sheetId);
+    fileRes = await conReintentos(subir, 'subir foto');
+  }
   const fileId = fileRes.data.id;
-  
+
   // Compartir públicamente
-  await drive.permissions.create({
-    fileId: fileId,
+  await conReintentos(() => drive.permissions.create({
+    fileId,
     requestBody: { role: 'reader', type: 'anyone' },
-  });
+  }), 'compartir foto');
 
   const url = `https://lh3.googleusercontent.com/d/${fileId}`;
-  
-  // Actualizar Sheets
   const fecha = getFormattedDate();
-  
-  // Leer historial y foto previa para armar el log
-  const resActual = await sheets.spreadsheets.values.batchGet({
-    spreadsheetId: sheetId,
-    ranges: [`INVENTARIO!N${fila}`, `INVENTARIO!J${fila}`]
-  });
-  
-  const fotoActual = resActual.data.valueRanges[0].values?.[0]?.[0];
-  const logActual = resActual.data.valueRanges[1].values?.[0]?.[0] || '';
-  
-  const entrada = `[${fecha}] (${email}) ${fotoActual ? '🔄 Imagen actualizada' : '📸 Imagen agregada'}`;
-  const nuevoLog = logActual ? `${entrada}\n${logActual}` : entrada;
 
-  await sheets.spreadsheets.values.batchUpdate({
-    spreadsheetId: sheetId,
-    requestBody: {
-      valueInputOption: 'USER_ENTERED',
-      data: [
-        { range: `INVENTARIO!N${fila}`, values: [[url]] },
-        { range: `INVENTARIO!J${fila}`, values: [[nuevoLog]] },
-        { range: `INVENTARIO!I${fila}`, values: [[fecha]] }
-      ]
-    }
-  });
+  await escribirFila(sheetId, art.fila, { [LETRA(COL.FOTO)]: url, [LETRA(COL.FECHA)]: fecha });
+  await registrarEvento(sheetId, art, email, 'FOTO',
+    art.foto ? '🔄 Imagen actualizada' : '📸 Imagen agregada', fecha);
 
   return url;
 }
 
 /** Registra un reporte de incidencia */
-async function registrarReporte(sheetId, email, fila, texto) {
+async function registrarReporte(sheetId, email, id, texto) {
   const { sheets } = getApis();
   if (!sheets) throw new Error("Google APIs no inicializadas");
+  const txt = (texto || '').toString().trim();
+  if (!txt) throw new Error('El reporte está vacío.');
 
+  const art = await ubicarArticulo(sheetId, id);
   const fecha = getFormattedDate();
-  
-  // Leer log previo
-  const logRes = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range: `INVENTARIO!J${fila}`
-  });
-  const prevLog = logRes.data.values?.[0]?.[0] || '';
-  const entrada = `[${fecha}] (${email}) ${texto}`;
-  const nuevoLog = prevLog ? `${entrada}\n${prevLog}` : entrada;
-  const textoTicket = `(${email}) ${texto}`;
 
-  await sheets.spreadsheets.values.batchUpdate({
-    spreadsheetId: sheetId,
-    requestBody: {
-      valueInputOption: 'USER_ENTERED',
-      data: [
-        { range: `INVENTARIO!J${fila}`, values: [[nuevoLog]] },
-        { range: `INVENTARIO!I${fila}`, values: [[fecha]] },
-        { range: `INVENTARIO!K${fila}`, values: [[textoTicket]] } // ticket para el panel
-      ]
-    }
+  // La columna K es el "ticket" abierto que usa el panel de incidencias
+  await escribirFila(sheetId, art.fila, {
+    [LETRA(COL.FECHA)]: fecha,
+    [LETRA(COL.REP)]: `(${email}) ${txt}`,
   });
-  
+  await registrarEvento(sheetId, art, email, 'REPORTE', txt, fecha);
   return true;
 }
 
 /** Cambia la zona de un artículo */
-async function cambiarUbicacion(sheetId, email, fila, nuevaZona) {
+async function cambiarUbicacion(sheetId, email, id, nuevaZona) {
   const { sheets } = getApis();
   if (!sheets) throw new Error("Google APIs no inicializadas");
+  const zonaNuevaStr = (nuevaZona || '').toString().trim();
+  if (!zonaNuevaStr) throw new Error('Falta la zona de destino.');
 
-  const zonaNuevaStr = nuevaZona.trim();
+  const art = await ubicarArticulo(sheetId, id);
   const fecha = getFormattedDate();
 
-  // Leer zona y log actual
-  const currentRes = await sheets.spreadsheets.values.batchGet({
-    spreadsheetId: sheetId,
-    ranges: [`INVENTARIO!H${fila}`, `INVENTARIO!J${fila}`]
+  await escribirFila(sheetId, art.fila, {
+    [LETRA(COL.ZONA)]: zonaNuevaStr,
+    [LETRA(COL.FECHA)]: fecha,
   });
-  
-  const zonaActual = currentRes.data.valueRanges[0].values?.[0]?.[0] || '';
-  const prevLog = currentRes.data.valueRanges[1].values?.[0]?.[0] || '';
-  
-  const entrada = `[${fecha}] (${email}) 🚚 Movido de '${zonaActual}' a '${zonaNuevaStr}'`;
-  const nuevoLog = prevLog ? `${entrada}\n${prevLog}` : entrada;
-
-  await sheets.spreadsheets.values.batchUpdate({
-    spreadsheetId: sheetId,
-    requestBody: {
-      valueInputOption: 'USER_ENTERED',
-      data: [
-        { range: `INVENTARIO!H${fila}`, values: [[zonaNuevaStr]] },
-        { range: `INVENTARIO!J${fila}`, values: [[nuevoLog]] },
-        { range: `INVENTARIO!I${fila}`, values: [[fecha]] }
-      ]
-    }
-  });
-
+  await registrarEvento(sheetId, art, email, 'MOVIDO', `🚚 Movido de '${art.zona}' a '${zonaNuevaStr}'`, fecha);
   return true;
 }
 
@@ -514,10 +763,10 @@ async function guardarZona(sheetId, id, nombre, desc) {
             }
           }
           if (updateData.length > 0) {
-            await sheets.spreadsheets.values.batchUpdate({
+            await conReintentos(() => sheets.spreadsheets.values.batchUpdate({
               spreadsheetId: sheetId,
               requestBody: { valueInputOption: 'USER_ENTERED', data: updateData }
-            });
+            }), 'propagar nombre de zona');
           }
         }
         
@@ -783,5 +1032,7 @@ module.exports = {
   guardarZona: conInvalidacion(guardarZona),
   eliminarZona: conInvalidacion(eliminarZona),
   ejecutarGeneracionQR,
-  invalidarLab
+  invalidarLab,
+  // para las pruebas
+  _internos: { calcularIdsFaltantes, getFormattedDate, esTransitorio, conReintentos },
 };

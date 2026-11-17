@@ -46,9 +46,11 @@ function cliente() {
 }
 
 for (const [rol, esperado] of Object.entries({
-  VISOR: { etiqueta: '· solo lectura', reportar: 403, mover: 403, escrituras: 0 },
-  LECTOR: { etiqueta: '· docente', reportar: 200, mover: 403, escrituras: 1 },
-  ADMIN: { etiqueta: '· admin', reportar: 200, mover: 200, escrituras: 2 },
+  // Escrituras: 2 al abrir el laboratorio por primera vez (columna ID, IDs y
+  // hoja HISTORIAL) + 2 por cada cambio permitido (fila + historial).
+  VISOR: { etiqueta: '· solo lectura', reportar: 403, mover: 403, escrituras: 2 },
+  LECTOR: { etiqueta: '· docente', reportar: 200, mover: 403, escrituras: 4 },
+  ADMIN: { etiqueta: '· admin', reportar: 200, mover: 200, escrituras: 6 },
 })) {
   test(`rol ${rol}`, async () => {
     const s = await arrancar({ MODO_DEMO: 'SI', DEMO_ROL: rol });
@@ -56,8 +58,8 @@ for (const [rol, esperado] of Object.entries({
       const http = cliente();
       assert.ok((await http(`${s.base}?zona=Z1`)).texto.includes(esperado.etiqueta));
       assert.equal((await http(`${s.base}/api/buscar?q=pro`)).status, 200);
-      assert.equal((await http(`${s.base}/api/reportar`, { method: 'POST', body: JSON.stringify({ fila: 3, texto: 'roto' }) })).status, esperado.reportar);
-      assert.equal((await http(`${s.base}/api/mover`, { method: 'POST', body: JSON.stringify({ fila: 3, nuevaZona: 'Z2' }) })).status, esperado.mover);
+      assert.equal((await http(`${s.base}/api/reportar`, { method: 'POST', body: JSON.stringify({ id: 'A0001', texto: 'roto' }) })).status, esperado.reportar);
+      assert.equal((await http(`${s.base}/api/mover`, { method: 'POST', body: JSON.stringify({ id: 'A0001', nuevaZona: 'Z2' }) })).status, esperado.mover);
       assert.equal(s.escrituras(), esperado.escrituras, 'escrituras en la planilla');
     } finally { await s.parar(); }
   });

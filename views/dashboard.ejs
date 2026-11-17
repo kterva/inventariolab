@@ -261,7 +261,7 @@
       let htmlStr = "";
       data.forEach(function(item) {
         const ubi = item.ubicacion ? item.ubicacion.toString().trim() : "";
-        const link = ubi ? WEB_APP_URL + "?zona=" + encodeURIComponent(ubi) + "#item-" + item.fila : null;
+        const link = ubi ? WEB_APP_URL + "?zona=" + encodeURIComponent(ubi) + "#item-" + encodeURIComponent(item.id || "fila" + item.fila) : null;
         const clickAttr = link ? `data-href="${esc(link)}" onclick="abrirConCarga(this.dataset.href)"` : '';
         const styleAttr = link ? 'style="cursor:pointer;" title="Ir al armario"' : '';
         const icon = link ? ' 🔗' : '';
@@ -317,7 +317,7 @@
       let htmlStr = `<div style="margin-bottom:15px; font-weight:bold; color:#e74c3c;">Faltan ${faltan.length} fotos en total.</div>`;
       faltan.forEach(function(item) {
         const ubi = item.ubicacion ? item.ubicacion.toString().trim() : "";
-        const link = ubi ? WEB_APP_URL + "?zona=" + encodeURIComponent(ubi) + "#item-" + item.fila : null;
+        const link = ubi ? WEB_APP_URL + "?zona=" + encodeURIComponent(ubi) + "#item-" + encodeURIComponent(item.id || "fila" + item.fila) : null;
         const clickAttr = link ? `data-href="${esc(link)}" onclick="abrirConCarga(this.dataset.href)"` : '';
         const styleAttr = link ? 'style="cursor:pointer;" title="Ir al armario para tomar la foto"' : '';
         const icon = link ? ' <span style="background:#1a5276; color:white; padding:2px 6px; border-radius:4px; font-size:0.75em; margin-left:5px;">📸 Ir a sacar foto</span>' : '';

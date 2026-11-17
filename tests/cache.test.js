@@ -1,6 +1,7 @@
 // Caché de lectura y permisos de googleClient, contra el simulador de Google.
 process.env.GOOGLE_SERVICE_ACCOUNT_JSON = '{}';
 process.env.SHEETS_CACHE_TTL_MS = '300';
+process.env.GOOGLE_BACKOFF_MS = '1';
 require('./fake-googleapis');
 const test = require('node:test');
 const assert = require('node:assert');
@@ -33,7 +34,7 @@ test('caché, permisos e invalidación', async (t) => {
 
   await t.test('búsqueda desde caché', async () => {
     const b = await gc.buscarEnInventario('L1', 'imá');
-    assert.deepEqual(b, [{ articulo: 'Imán', bien: '2', regular: '0', roto: '0', ubicacion: 'Z2', foto: undefined, fila: 5 }]);
+    assert.deepEqual(b, [{ id: 'A0003', articulo: 'Imán', bien: '2', regular: '0', roto: '0', ubicacion: 'Z2', foto: '', fila: 5 }]);
     assert.equal(m.batchGet, 1, 'dentro del TTL no se vuelve a consultar');
   });
 
@@ -87,7 +88,7 @@ test('caché, permisos e invalidación', async (t) => {
   await t.test('las escrituras invalidan la caché', async () => {
     await gc.getAppConfig('L3');
     const antes = m.batchGet;
-    await gc.registrarReporte('L3', 'a@b', 3, 'roto');
+    await gc.registrarReporte('L3', 'a@b', 'A0001', 'roto');
     await gc.getAppConfig('L3');
     assert.equal(m.batchGet, antes + 1);
   });

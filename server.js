@@ -297,8 +297,8 @@ router.get('/lab/:labId/api/buscar', apiAuth, async (req, res) => {
 
 router.post('/lab/:labId/api/reportar', apiAuth, requireReportar, async (req, res) => {
   try {
-    const { fila, texto } = req.body;
-    await googleClient.registrarReporte(req.params.labId, req.userEmail, fila, texto);
+    const { id, texto } = req.body;
+    await googleClient.registrarReporte(req.params.labId, req.userEmail, id, texto);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -307,8 +307,8 @@ router.post('/lab/:labId/api/reportar', apiAuth, requireReportar, async (req, re
 
 router.post('/lab/:labId/api/foto', apiAuth, requireAdmin, async (req, res) => {
   try {
-    const { fila, base64, nombreArchivo } = req.body;
-    const url = await googleClient.subirFoto(req.params.labId, req.userEmail, fila, base64, nombreArchivo);
+    const { id, base64, nombreArchivo } = req.body;
+    const url = await googleClient.subirFoto(req.params.labId, req.userEmail, id, base64, nombreArchivo);
     res.json({ url });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -317,8 +317,8 @@ router.post('/lab/:labId/api/foto', apiAuth, requireAdmin, async (req, res) => {
 
 router.post('/lab/:labId/api/mover', apiAuth, requireAdmin, async (req, res) => {
   try {
-    const { fila, nuevaZona } = req.body;
-    await googleClient.cambiarUbicacion(req.params.labId, req.userEmail, fila, nuevaZona);
+    const { id, nuevaZona } = req.body;
+    await googleClient.cambiarUbicacion(req.params.labId, req.userEmail, id, nuevaZona);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
