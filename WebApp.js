@@ -176,7 +176,46 @@ function buildAccessDeniedHtml(email) {
 }
 
 // ─── WEB APP: GET ─────────────────────────────────────
+// Desde noviembre de 2026 la app corre en Node.js (InventarioLab 2.x). Esta
+// versión de Apps Script solo redirige: los QR impresos apuntan acá y tienen
+// que seguir funcionando, pero toda escritura pasa por la app nueva (IDs fijos
+// e historial en la hoja HISTORIAL).
+var URL_APP_NUEVA = "https://culturalibre.edu.uy/inventariolab";
+
 function doGet(e) {
+  var zona = ((e && e.parameter && e.parameter.zona) || "").trim();
+  var destino = URL_APP_NUEVA + "/lab/" + encodeURIComponent(getSS().getId()) +
+    (zona ? "?zona=" + encodeURIComponent(zona) : "");
+  return HtmlService.createHtmlOutput(buildRedireccionHtml(destino, zona))
+    .setTitle(zona ? "Inventario — " + zona : "InventarioLab")
+    .addMetaTag("viewport", "width=device-width, initial-scale=1");
+}
+
+/** Página que lleva a la app nueva (Apps Script no permite redirecciones HTTP) */
+function buildRedireccionHtml(destino, zona) {
+  var esc = function (s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  };
+  // JSON + escapado de "<" para insertar el destino dentro de <script> sin riesgo
+  var destinoJs = JSON.stringify(destino).replace(/</g, "\\u003c");
+  return "<!doctype html><html><head><meta charset='utf-8'><base target='_top'>" +
+    "<style>body{font-family:sans-serif;background:#f4f6f7;margin:0;padding:2rem 1rem;text-align:center;color:#2c3e50}" +
+    ".caja{max-width:420px;margin:auto;background:#fff;border-radius:12px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,.08)}" +
+    "a.btn{display:block;background:#1a5276;color:#fff;text-decoration:none;font-weight:bold;padding:14px;border-radius:8px;margin-top:1rem;font-size:1.1rem}" +
+    "p{line-height:1.4}</style></head><body><div class='caja'>" +
+    "<h2>📦 InventarioLab se mudó</h2>" +
+    "<p>" + (zona ? "El armario <strong>" + esc(zona) + "</strong> ahora se abre" : "El inventario ahora está") +
+    " en la versión nueva de la aplicación.</p>" +
+    "<a class='btn' href='" + esc(destino) + "' target='_top'>" + (zona ? "Abrir el armario" : "Abrir InventarioLab") + "</a>" +
+    "<p style='font-size:.85rem;color:#7f8c8d'>Si guardaste este enlace, reemplazalo por el nuevo.</p>" +
+    "</div><script>try { window.top.location.replace(" + destinoJs + "); } catch (err) {}</script>" +
+    "</body></html>";
+}
+
+/** doGet de la versión 1.x (Apps Script), conservado como referencia */
+function doGetAnterior(e) {
   var email = Session.getActiveUser().getEmail().toLowerCase().trim();
   var permisos = verificarPermisos(email);
   var zona = (e.parameter.zona || "").trim();
