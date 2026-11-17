@@ -43,7 +43,7 @@
 <nav>
   <div id="nav-title">
     <div style="font-size: 1.1rem; font-weight: bold;"><%= config.laboratorio %></div>
-    <div style="font-size: 0.75rem; opacity: 0.85;"><%= config.institucion %> - <%= esAdmin ? "Admin" : "Usuario" %></div>
+    <div style="font-size: 0.75rem; opacity: 0.85;"><%= config.institucion %> - <%= esAdmin ? "Admin" : (typeof rol !== 'undefined' && rol === 'VISOR') ? "Solo lectura" : "Usuario" %></div>
   </div>
   <div style="display: flex; align-items: center;">
     <% if (esAdmin) { %>

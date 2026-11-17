@@ -194,26 +194,36 @@ async function getAppConfig(sheetId) {
   return config;
 }
 
+/**
+ * Traduce el rol de la columna B de 'config' a permisos concretos.
+ *  - ADMIN: todo (fotos, mover, zonas, QR, reportar).
+ *  - VISOR: solo lectura (buscar y ver zonas), no puede reportar.
+ *  - cualquier otro valor (USER, LECTOR, vacío...): ve y puede reportar incidencias.
+ */
+function permisosDeRol(rol) {
+  const r = (rol || '').toString().toUpperCase().trim();
+  return { autorizado: true, esAdmin: r === 'ADMIN', puedeReportar: r !== 'VISOR', rol: r };
+}
+
+const SIN_PERMISOS = Object.freeze({ autorizado: false, esAdmin: false, puedeReportar: false, rol: '' });
+
 /** Verifica si el email está en la columna A de 'config' y retorna el rol de la columna B */
 async function verificarPermisos(sheetId, email) {
   // Las llamadas a verificarPermisos en el demo se bypassan en server.js,
   // pero por si acaso, dejamos esta función intacta porque necesita sheetId.
-  if (!email) return { autorizado: false, esAdmin: false };
+  if (!email) return { ...SIN_PERMISOS };
 
   try {
     const data = hoja(await cargarLab(sheetId), 'config').slice(1); // equivale a config!A2:B100
     const buscado = email.toLowerCase().trim();
     for (let i = 0; i < data.length; i++) {
       const mailFila = (data[i][0] || '').toString().toLowerCase().trim();
-      const rolFila = (data[i][1] || '').toString().toUpperCase().trim();
-      if (mailFila === buscado) {
-        return { autorizado: true, esAdmin: (rolFila === 'ADMIN') };
-      }
+      if (mailFila === buscado) return permisosDeRol(data[i][1]);
     }
   } catch (e) {
     console.error(`[verificarPermisos] Error al leer permisos de ${sheetId}:`, e.message);
   }
-  return { autorizado: false, esAdmin: false };
+  return { ...SIN_PERMISOS };
 }
 
 /** Devuelve las filas de inventario que pertenezcan a una zona específica */
@@ -763,6 +773,7 @@ function conInvalidacion(fn) {
 module.exports = {
   getAppConfig,
   verificarPermisos,
+  permisosDeRol,
   getFilasPorZona,
   buscarEnInventario,
   obtenerZonasAdmin,

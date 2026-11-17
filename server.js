@@ -133,19 +133,14 @@ router.get('/lab/:labId', async (req, res) => {
 
   // Si tiene zona (Vista de armario)
   if (zona) {
-    let autorizado = false;
-    let esAdmin = false;
+    let permisos = { autorizado: false, esAdmin: false, puedeReportar: false };
 
     if (email && req.session.labId === labId) {
-      if (req.appConfig.isDemo === 'SI') {
-        autorizado = true;
-        esAdmin = req.appConfig.demoRol === 'ADMIN';
-      } else {
-        const permisos = await googleClient.verificarPermisos(labId, email);
-        autorizado = permisos.autorizado;
-        esAdmin = permisos.esAdmin;
-      }
+      permisos = req.appConfig.isDemo === 'SI'
+        ? googleClient.permisosDeRol(req.appConfig.demoRol)
+        : await googleClient.verificarPermisos(labId, email);
     }
+    const { autorizado, esAdmin, puedeReportar } = permisos;
 
     if (req.appConfig.accesoPublico === 'NO' && !autorizado) {
       return res.redirect(`/inventariolab/lab/${labId}/login?redirect=${encodeURIComponent(req.originalUrl)}`);
@@ -156,7 +151,7 @@ router.get('/lab/:labId', async (req, res) => {
       const zonasAdmin = esAdmin ? await googleClient.obtenerZonasAdmin(labId) : [];
       const arrayZonas = zonasAdmin.map(z => (z[1] || '').toString().trim()).filter(String);
       
-      const config = { ...req.appConfig, esAdmin, autorizado, email, zonasAdmin: arrayZonas };
+      const config = { ...req.appConfig, esAdmin, autorizado, puedeReportar, email, zonasAdmin: arrayZonas };
       
       return res.render('armario', { zona, filas, config, labId });
     } catch (err) {
@@ -170,14 +165,9 @@ router.get('/lab/:labId', async (req, res) => {
     return res.redirect(`/inventariolab/lab/${labId}/login`);
   }
 
-  let permisos = { autorizado: false, esAdmin: false };
-  
-  if (req.appConfig.isDemo === 'SI') {
-    permisos.autorizado = true;
-    permisos.esAdmin = req.appConfig.demoRol === 'ADMIN';
-  } else {
-    permisos = await googleClient.verificarPermisos(labId, email);
-  }
+  const permisos = req.appConfig.isDemo === 'SI'
+    ? googleClient.permisosDeRol(req.appConfig.demoRol)
+    : await googleClient.verificarPermisos(labId, email);
 
   if (!permisos.autorizado) {
     return res.render('access_denied', { email, config: req.appConfig });
@@ -186,6 +176,7 @@ router.get('/lab/:labId', async (req, res) => {
   return res.render('dashboard', { 
     config: req.appConfig, 
     esAdmin: permisos.esAdmin,
+    rol: permisos.rol,
     email,
     labId 
   });
@@ -256,13 +247,9 @@ const apiAuth = async (req, res, next) => {
   const labId = req.params.labId;
   if (!email || req.session.labId !== labId) return res.status(401).json({ error: 'No autenticado' });
   
-  let permisos = { autorizado: false, esAdmin: false };
-  if (req.appConfig.isDemo === 'SI') {
-    permisos.autorizado = true;
-    permisos.esAdmin = req.appConfig.demoRol === 'ADMIN';
-  } else {
-    permisos = await googleClient.verificarPermisos(labId, email);
-  }
+  const permisos = req.appConfig.isDemo === 'SI'
+    ? googleClient.permisosDeRol(req.appConfig.demoRol)
+    : await googleClient.verificarPermisos(labId, email);
 
   if (!permisos.autorizado) return res.status(403).json({ error: 'No autorizado' });
   
@@ -276,6 +263,12 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+// El rol VISOR es de solo lectura: no puede reportar incidencias
+const requireReportar = (req, res, next) => {
+  if (!req.userPermisos.puedeReportar) return res.status(403).json({ error: 'Tu rol es de solo lectura' });
+  next();
+};
+
 router.get('/lab/:labId/api/buscar', apiAuth, async (req, res) => {
   try {
     const resultados = await googleClient.buscarEnInventario(req.params.labId, req.query.q || '');
@@ -285,7 +278,7 @@ router.get('/lab/:labId/api/buscar', apiAuth, async (req, res) => {
   }
 });
 
-router.post('/lab/:labId/api/reportar', apiAuth, async (req, res) => {
+router.post('/lab/:labId/api/reportar', apiAuth, requireReportar, async (req, res) => {
   try {
     const { fila, texto } = req.body;
     await googleClient.registrarReporte(req.params.labId, req.userEmail, fila, texto);

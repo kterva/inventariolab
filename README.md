@@ -15,7 +15,7 @@ Originalmente, el sistema fue desarrollado 100% sobre **Google Apps Script**. Se
 Para solucionar los cuellos de botella de velocidad y concurrencia, el sistema fue rescrito y migrado a un servidor profesional (VPS) corriendo bajo **Node.js** y **Express**.
 * **Base de Datos:** Se sigue utilizando Google Sheets como base de datos central (gracias a la API de Google Cloud y Cuentas de Servicio) para que los docentes no pierdan la comodidad de editar datos en una planilla de Excel.
 * **Velocidad:** Las búsquedas que antes demoraban 5 segundos ahora son instantáneas (<100ms).
-* **Seguridad:** Autenticación profesional vía Google OAuth 2.0 con control estricto de roles (Admin/Lector).
+* **Seguridad:** Autenticación profesional vía Google OAuth 2.0 con control estricto de roles (Admin / Usuario / Visor de solo lectura).
 * **PWA:** Ahora el sistema es una Aplicación Web Progresiva instalable en Android e iOS, capaz de comportarse como una App nativa.
 
 ## 🛠 Ficha Técnica

@@ -100,7 +100,7 @@ header .sub{font-size:.8rem;opacity:.75}
 <nav class="nav-bar">
   <h3><%= config.laboratorio %> - <%= config.institucion %></h3>
   <div><%= zona %></div>
-  <div class="sub"><%= config.email ? config.email : "Invitado" %><%= config.esAdmin ? " · admin" : config.autorizado ? " · docente" : "" %></div>
+  <div class="sub"><%= config.email ? config.email : "Invitado" %><%= config.esAdmin ? " · admin" : !config.autorizado ? "" : config.puedeReportar ? " · docente" : " · solo lectura" %></div>
   <% if (config.autorizado) { %>
     <a class="btn-dash" href="/inventariolab/lab/<%= labId %>">← <%= config.esAdmin ? "Dashboard" : "Buscar Artículo" %></a>
   <% } else { %>
@@ -139,6 +139,7 @@ const DATA = <%- JSON.stringify(filas).replace(/</g, '\\u003c') %>;
 const ZONAS = <%- JSON.stringify(config.zonasAdmin).replace(/</g, '\\u003c') %>;
 const ADMIN = <%= config.esAdmin %>;
 const AUTORIZADO = <%= config.autorizado %>;
+const PUEDE_REPORTAR = <%= !!config.puedeReportar %>;
 const LAB_ID = <%- JSON.stringify(labId).replace(/</g, '\\u003c') %>;
 
 // Escapa texto antes de insertarlo como HTML (los datos vienen de la planilla y de los usuarios)
@@ -272,7 +273,10 @@ function render(f) {
   if (foto) html += "<img class='thumb' data-src='" + esc(foto) + "' loading='lazy'>";
   html += btnFoto;
   html += "<div class='rep-wrap'>";
-  if (AUTORIZADO) {
+  if (AUTORIZADO && !PUEDE_REPORTAR) {
+    // Rol VISOR: solo lectura, sin formulario de reporte
+    if (btnMover) html += "<div style='display:flex; gap:6px;'>" + btnMover + "</div>";
+  } else if (AUTORIZADO) {
     html += "<input class='rep-input' data-fila='" + fila + "' placeholder='Describí el problema...'>";
     html += "<div style='display:flex; gap:6px;'>" + "<button class='rep-btn' onclick='enviar(this)'>Reportar</button>" + btnMover + "</div>";
   } else {
