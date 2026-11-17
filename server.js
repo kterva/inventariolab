@@ -10,6 +10,17 @@ const app = express();
 app.set('trust proxy', 1); // Confiar en el proxy de Nginx
 const PORT = process.env.PORT || 3000;
 
+// Email de la cuenta de servicio, tomado de la credencial configurada.
+// Es el email con el que cada liceo debe compartir su planilla.
+const SERVICE_ACCOUNT_EMAIL = (() => {
+  try {
+    return JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '{}').client_email || 'cuenta-de-servicio@...';
+  } catch (err) {
+    console.error('Error parseando GOOGLE_SERVICE_ACCOUNT_JSON');
+    return 'cuenta-de-servicio@...';
+  }
+})();
+
 // Configurar EJS
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -87,7 +98,7 @@ router.use('/lab/:labId', async (req, res, next) => {
     if (err.message === "ACCESO_DENEGADO") {
       // Remover cualquier id defectuoso o sin permisos del cliente
       return res.render('setup_error', { 
-        serviceAccountEmail: googleClient.SERVICE_ACCOUNT_EMAIL || 'inventario-server-770@gen-lang-client-0264087708.iam.gserviceaccount.com'
+        serviceAccountEmail: SERVICE_ACCOUNT_EMAIL
       });
     }
     console.error('Error al obtener config:', err);
@@ -183,17 +194,11 @@ router.get('/lab/:labId', async (req, res) => {
 // ─── RUTAS GLOBALES (SIN LABID) ────────────────────────
 
 router.get('/', (req, res) => {
-  let saEmail = 'cuenta-de-servicio@...';
-  try {
-    const credsStr = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-    if (credsStr) {
-      const creds = JSON.parse(credsStr);
-      if (creds.client_email) saEmail = creds.client_email;
-    }
-  } catch (err) {
-    console.error('Error parseando JSON en ruta home');
-  }
-  res.render('home', { serviceAccountEmail: saEmail });
+  res.render('home', { serviceAccountEmail: SERVICE_ACCOUNT_EMAIL });
+});
+
+router.get('/privacidad', (req, res) => {
+  res.render('privacidad');
 });
 
 router.get('/ayuda', (req, res) => {
@@ -353,17 +358,7 @@ router.post('/lab/:labId/api/generar-qrs', apiAuth, requireAdmin, async (req, re
 
 // Ruta principal de bienvenida / onboarding
 router.get('/', (req, res) => {
-  let saEmail = 'cuenta-de-servicio@...';
-  try {
-    const credsStr = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-    if (credsStr) {
-      const creds = JSON.parse(credsStr);
-      if (creds.client_email) saEmail = creds.client_email;
-    }
-  } catch (err) {
-    console.error('Error parseando JSON en ruta home');
-  }
-  res.render('home', { serviceAccountEmail: saEmail });
+  res.render('home', { serviceAccountEmail: SERVICE_ACCOUNT_EMAIL });
 });
 
 // Montar el router en el subpath definido

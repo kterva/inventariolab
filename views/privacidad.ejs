@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Política de privacidad - InventarioLab</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap">
+  <style>
+    :root { --primary: #1a5276; --secondary: #2980b9; --bg: #f4f7f6; --text: #333; }
+    body { font-family: 'Roboto', sans-serif; margin: 0; background: var(--bg); color: var(--text); line-height: 1.6; }
+    nav { background: var(--primary); color: white; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
+    .nav-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); padding: 5px 15px; border-radius: 4px; color: white; text-decoration: none; font-size: 0.9rem; font-weight: bold; }
+    .container { max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+    .section { background: white; padding: 1.5rem 2rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 1.5rem; }
+    h1 { color: var(--primary); margin-bottom: 0.25rem; }
+    h2 { color: var(--primary); font-size: 1.2rem; margin-top: 0; }
+    .meta { color: #7f8c8d; margin-top: 0; }
+    a { color: var(--secondary); }
+    li { margin-bottom: 0.4rem; }
+    @media (max-width: 600px) { .section { padding: 1.25rem; } }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div style="font-weight: bold; font-size: 1.1rem;">🔒 InventarioLab</div>
+  <a href="/inventariolab" class="nav-btn">Inicio</a>
+</nav>
+
+<div class="container">
+  <h1>Política de privacidad</h1>
+  <p class="meta">Última actualización: 17 de noviembre de 2026</p>
+
+  <div class="section">
+    <h2>Qué es InventarioLab y quién es responsable</h2>
+    <p>InventarioLab es una aplicación de código abierto para llevar el inventario de los laboratorios de centros educativos. La mantiene Leonardo Trujillo y se ofrece en <strong>culturalibre.edu.uy/inventariolab</strong>.</p>
+    <p>Cada centro educativo usa su propia planilla de Google Sheets como base de datos. El centro es dueño de esa planilla y decide quién tiene acceso a su inventario. La aplicación solo actúa sobre las planillas que el centro comparte con ella.</p>
+  </div>
+
+  <div class="section">
+    <h2>Qué datos usamos</h2>
+    <ul>
+      <li><strong>Inicio de sesión con Google:</strong> solo pedimos tu <strong>dirección de email</strong> y los datos básicos de tu perfil. Usamos el email para saber quién sos y verificar si estás autorizado en la planilla del laboratorio. No accedemos a tu Gmail, tu Drive ni a ningún otro dato de tu cuenta.</li>
+      <li><strong>Registro de cambios:</strong> cuando reportás un problema, movés un artículo o subís una foto, se anota en la planilla del laboratorio la fecha, tu email y la acción realizada, para que el centro sepa quién hizo cada cambio.</li>
+      <li><strong>Fotos de materiales:</strong> las fotos que suben los administradores se guardan en una carpeta de Google Drive asociada a la planilla del laboratorio. Para poder mostrarlas en la aplicación, quedan <strong>visibles para cualquier persona que tenga el enlace</strong>. No subas fotos de personas ni de información sensible.</li>
+      <li><strong>Cookie de sesión:</strong> una cookie mantiene tu sesión abierta hasta por 30 días o hasta que cierres sesión.</li>
+      <li><strong>En tu dispositivo:</strong> la aplicación recuerda en tu navegador el último laboratorio que abriste, para entrar directo la próxima vez.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Dónde se guardan</h2>
+    <p>Los datos del inventario y el registro de cambios están en la planilla y la carpeta de Google Drive del centro educativo, no en el servidor de InventarioLab.</p>
+    <p>El servidor, ubicado en Alemania, solo guarda la sesión de cada usuario y una copia temporal de la planilla durante unos minutos, para responder más rápido. No mantiene una base de datos propia con tus datos.</p>
+  </div>
+
+  <div class="section">
+    <h2>Con quién se comparten</h2>
+    <p>No vendemos ni cedemos datos, no mostramos publicidad y no usamos herramientas de analítica o seguimiento. Para funcionar, la aplicación usa estos servicios:</p>
+    <ul>
+      <li><strong>Google</strong>: inicio de sesión, Google Sheets y Google Drive (donde están los datos del centro) y Google Fonts (tipografías).</li>
+      <li><strong>Cloudflare</strong>: intermediario de red que protege y acelera el acceso al sitio.</li>
+      <li><strong>api.qrserver.com</strong>: cuando un administrador genera las etiquetas QR, este servicio recibe el enlace de cada zona para dibujar el código.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Cuánto tiempo se conservan</h2>
+    <p>La sesión dura hasta 30 días. Los datos de la planilla y las fotos se conservan mientras el centro educativo los mantenga en su Google Drive. El centro puede editarlos o borrarlos en cualquier momento.</p>
+  </div>
+
+  <div class="section">
+    <h2>Tus derechos</h2>
+    <p>De acuerdo con la Ley N.º 18.331 de Protección de Datos Personales de Uruguay, podés pedir acceso, rectificación o supresión de tus datos. Si se trata del registro de cambios de un laboratorio, el centro educativo puede corregirlo directamente en su planilla. También podés escribirnos a <a href="mailto:trujillo.leonardo@gmail.com">trujillo.leonardo@gmail.com</a>.</p>
+    <p>Podés dejar de usar la aplicación y revocar su acceso a tu cuenta de Google en cualquier momento desde <a href="https://myaccount.google.com/connections" target="_blank" rel="noopener">myaccount.google.com/connections</a>.</p>
+  </div>
+
+  <div class="section">
+    <h2>Cambios en esta política</h2>
+    <p>Si cambiamos esta política, publicaremos la nueva versión en esta misma página con su fecha de actualización.</p>
+  </div>
+</div>
+
+</body>
+</html>
