@@ -19,7 +19,9 @@ const fila = { id: 'A0007', fila: 7, articulo: 'Probeta ' + X, bien: 2, regular:
 const config = { laboratorio: 'Lab', institucion: 'Liceo', esAdmin: true, autorizado: true, puedeReportar: true, email: 'yo@x', zonasAdmin: ['Z1', X] };
 
 function cargarArmario(cfg) {
-  const html = ejs.render(vista('armario.ejs'), { zona: 'Z1', filas: [fila], config: cfg, labId: 'ABC' });
+  const html = ejs.render(vista('armario.ejs'), { zona: 'Z1', filas: [fila], config: cfg, labId: 'ABC',
+    urlLogin: '/inventariolab/lab/ABC/login?redirect=%2Finventariolab%2Flab%2FABC%3Fzona%3DZ1',
+    urlCambiarCuenta: '/inventariolab/lab/ABC/logout?redirect=%2Finventariolab%2Flab%2FABC%3Fzona%3DZ1' });
   const sc = scripts(html);
   sc.forEach((c, i) => new vm.Script(c, { filename: 'armario-' + i }));
   const ctx = navegador();
@@ -47,7 +49,21 @@ test('armario: formulario de reporte según el rol', () => {
   assert.ok(!render({ autorizado: true, puedeReportar: false }).includes('rep-input'), 'VISOR: sin formulario');
   const lector = render({ autorizado: true, puedeReportar: true });
   assert.ok(lector.includes('rep-input') && !lector.includes('disabled'), 'LECTOR: formulario activo');
-  assert.ok(render({ autorizado: false, puedeReportar: false }).includes('disabled'), 'invitado: deshabilitado');
+  const invitado = render({ autorizado: false, puedeReportar: false, email: '' });
+  assert.ok(invitado.includes("class='rep-login' href='/inventariolab/lab/ABC/login?redirect=%2Finventariolab%2Flab%2FABC%3Fzona%3DZ1'"),
+    'invitado: enlace al login que vuelve al armario');
+  assert.ok(!invitado.includes('rep-input'), 'invitado: sin formulario deshabilitado');
+  assert.ok(render({ autorizado: false, puedeReportar: false, email: 'otro@x.uy' }).includes('/logout?redirect='),
+    'cuenta sin acceso: cambiar de cuenta, no un login que vuelve acá');
+});
+
+test('armario: encabezado con botón de login para el invitado', () => {
+  const invitado = cargarArmario({ ...config, esAdmin: false, autorizado: false, puedeReportar: false, email: '' }).html;
+  assert.match(invitado, /<header>[\s\S]*class="btn-login" href="\/inventariolab\/lab\/ABC\/login\?redirect=%2Finventariolab%2Flab%2FABC%3Fzona%3DZ1"[\s\S]*<\/header>/);
+  const sinAcceso = cargarArmario({ ...config, esAdmin: false, autorizado: false, puedeReportar: false, email: 'otro@x.uy' }).html;
+  assert.ok(sinAcceso.includes('no tiene acceso') && sinAcceso.includes('Cambiar de cuenta') && !sinAcceso.includes('🔑 Iniciar sesión'));
+  const docente = cargarArmario({ ...config, esAdmin: false }).html;
+  assert.ok(!docente.includes('class="btn-login"'), 'con sesión no aparece');
 });
 
 test('armario: sin ID no se ofrecen escrituras, y un ID raro se escapa', () => {

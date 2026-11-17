@@ -18,6 +18,13 @@ header .sub{font-size:.8rem;opacity:.75}
   transition:background .2s;
 }
 .btn-dash:hover{background:rgba(255,255,255,.28)}
+.btn-login{
+  display:inline-block; margin-top:.6rem; padding:.5rem 1.1rem;
+  background:#fff; color:#1a5276; text-decoration:none; font-weight:600;
+  border-radius:20px; font-size:.9rem;
+}
+.aviso-cuenta{font-size:.8rem;margin-top:.5rem;opacity:.9}
+.rep-login{display:block;text-align:center;text-decoration:none;background:#1a5276;color:#fff;padding:10px;border-radius:8px;font-weight:600;font-size:.9rem;margin-top:6px}
 
 .item{
   background:#fff; margin:.8rem; padding:1rem; border-radius:12px; border:1px solid #e0e0e0; transition: opacity 0.3s ease;
@@ -97,14 +104,18 @@ header .sub{font-size:.8rem;opacity:.75}
   <div style="position:fixed;top:30px;right:-40px;background:#e74c3c;color:white;padding:5px 40px;transform:rotate(45deg);font-weight:bold;z-index:99999;pointer-events:none;box-shadow:0 2px 4px rgba(0,0,0,0.2); letter-spacing: 1px;">MODO DEMO</div>
 <% } %>
 
-<nav class="nav-bar">
+<header>
   <h3><%= config.laboratorio %> - <%= config.institucion %></h3>
   <div><%= zona %></div>
   <div class="sub"><%= config.email ? config.email : "Invitado" %><%= config.esAdmin ? " · admin" : !config.autorizado ? "" : config.puedeReportar ? " · docente" : " · solo lectura" %></div>
   <% if (config.autorizado) { %>
     <a class="btn-dash" href="/inventariolab/lab/<%= labId %>">← <%= config.esAdmin ? "Dashboard" : "Buscar Artículo" %></a>
+  <% } else if (config.email) { %>
+    <%# Inició sesión, pero su cuenta no figura en la hoja config: "iniciar sesión" lo traería de vuelta acá %>
+    <div class="aviso-cuenta">Esta cuenta no tiene acceso a este laboratorio.</div>
+    <a class="btn-login" href="<%= urlCambiarCuenta %>">🔄 Cambiar de cuenta</a>
   <% } else { %>
-    <a class="btn-dash" href="/inventariolab/lab/<%= labId %>/login">← Iniciar sesión</a>
+    <a class="btn-login" href="<%= urlLogin %>">🔑 Iniciar sesión</a>
   <% } %>
 </header>
 
@@ -141,6 +152,7 @@ const ADMIN = <%= config.esAdmin %>;
 const AUTORIZADO = <%= config.autorizado %>;
 const PUEDE_REPORTAR = <%= !!config.puedeReportar %>;
 const LAB_ID = <%- JSON.stringify(labId).replace(/</g, '\\u003c') %>;
+const URL_LOGIN = <%- JSON.stringify(config.email ? urlCambiarCuenta : urlLogin).replace(/</g, '\\u003c') %>;
 
 // Escapa texto antes de insertarlo como HTML (los datos vienen de la planilla y de los usuarios)
 function esc(v) {
@@ -285,8 +297,8 @@ function render(f) {
     html += "<input class='rep-input' placeholder='Describí el problema...'>";
     html += "<div style='display:flex; gap:6px;'>" + "<button class='rep-btn' onclick='enviar(this)'>Reportar</button>" + btnMover + "</div>";
   } else {
-    html += "<input class='rep-input' placeholder='Inicia sesión para reportar...' disabled>";
-    html += "<div style='display:flex; gap:6px;'>" + "<button class='rep-btn' style='background:#95a5a6; cursor:not-allowed;' disabled>Reportar</button>" + btnMover + "</div>";
+    // Invitado: en lugar de un formulario deshabilitado, un enlace al login que vuelve a este armario
+    html += "<a class='rep-login' href='" + esc(URL_LOGIN) + "'>🔑 Iniciá sesión para reportar</a>";
   }
   html += "</div></div>";
 

@@ -125,22 +125,45 @@ router.use('/lab/:labId', async (req, res, next) => {
 
 // ─── RUTAS DE VISTAS ──────────────────────────────────
 
+/**
+ * Destino al que volver después del login/logout. Solo se aceptan rutas de
+ * esta app: cualquier otra cosa (otro dominio, //host, \host) se reemplaza
+ * por el inicio del laboratorio, para que nadie pueda armar un enlace de login
+ * que termine en otro sitio (open redirect).
+ */
+function destinoSeguro(destino, labId) {
+  const porDefecto = `/inventariolab/lab/${labId || 'default'}`;
+  if (typeof destino !== 'string' || destino.length > 2000) return porDefecto;
+  if (!destino.startsWith('/inventariolab/') || /[\\\s]/.test(destino) || destino.startsWith('//')) return porDefecto;
+  return destino;
+}
+
+/** Enlace a la página de login que vuelve a `destino` */
+function urlLogin(labId, destino) {
+  return `/inventariolab/lab/${labId}/login?redirect=${encodeURIComponent(destinoSeguro(destino, labId))}`;
+}
+
 router.get('/lab/:labId/login', (req, res) => {
-  // Si ya está logueado y autorizado, redirigir al dashboard
-  if (req.session.email) {
-    return res.redirect(`/inventariolab/lab/${req.params.labId}`);
+  const destino = destinoSeguro(req.query.redirect, req.params.labId);
+  // Si ya inició sesión en este laboratorio, vuelve directo a donde estaba
+  if (req.session.email && req.session.labId === req.params.labId) {
+    return res.redirect(destino);
   }
-  
-  res.render('login', { 
-    labId: req.params.labId, 
+
+  res.render('login', {
+    labId: req.params.labId,
     config: req.appConfig,
-    redirect: req.query.redirect || `/inventariolab/lab/${req.params.labId}`
+    redirect: destino
   });
 });
 
 router.get('/lab/:labId/logout', (req, res) => {
-  req.session.destroy();
-  res.redirect(`/inventariolab/lab/${req.params.labId}/login`);
+  // Con ?redirect= (p. ej. "cambiar de cuenta" desde un armario) se vuelve
+  // al login y, tras iniciar sesión, a esa misma página
+  const destino = req.query.redirect;
+  req.session.destroy(() => {
+    res.redirect(destino ? urlLogin(req.params.labId, destino) : `/inventariolab/lab/${req.params.labId}/login`);
+  });
 });
 
 router.get('/lab/:labId', async (req, res) => {
@@ -160,7 +183,7 @@ router.get('/lab/:labId', async (req, res) => {
     const { autorizado, esAdmin, puedeReportar } = permisos;
 
     if (req.appConfig.accesoPublico === 'NO' && !autorizado) {
-      return res.redirect(`/inventariolab/lab/${labId}/login?redirect=${encodeURIComponent(req.originalUrl)}`);
+      return res.redirect(urlLogin(labId, req.originalUrl));
     }
 
     try {
@@ -170,7 +193,9 @@ router.get('/lab/:labId', async (req, res) => {
       
       const config = { ...req.appConfig, esAdmin, autorizado, puedeReportar, email, zonasAdmin: arrayZonas };
       
-      return res.render('armario', { zona, filas, config, labId });
+      return res.render('armario', { zona, filas, config, labId,
+        urlLogin: urlLogin(labId, req.originalUrl),
+        urlCambiarCuenta: `/inventariolab/lab/${labId}/logout?redirect=${encodeURIComponent(req.originalUrl)}` });
     } catch (err) {
       console.error(err);
       return res.status(500).send('Error cargando zona');
@@ -220,7 +245,7 @@ router.get('/auth/google', (req, res, next) => {
     return res.status(500).send('Google OAuth no está configurado (Falta el Client ID). Revisa tu .env');
   }
   const labId = req.query.labId;
-  const redirect = req.query.redirect || `/inventariolab/lab/${labId}`;
+  const redirect = destinoSeguro(req.query.redirect, labId);
   
   // Guardamos estado en un Base64 (A prueba de fallos de sesión)
   const stateStr = Buffer.from(JSON.stringify({ labId, redirect })).toString('base64');
@@ -249,8 +274,7 @@ router.get('/auth/google/callback',
     // Forzar guardado de la cookie ANTES de redirigir
     req.session.save((err) => {
       if (err) console.error("Error guardando sesion final:", err);
-      const finalRedirect = redirect || `/inventariolab/lab/${labId || 'default'}`;
-      res.redirect(finalRedirect);
+      res.redirect(destinoSeguro(redirect, labId));
     });
   }
 );

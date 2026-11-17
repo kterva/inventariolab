@@ -94,6 +94,37 @@ test('sesiones: sobreviven a un reinicio, logout y cookies manipuladas', async (
   } finally { await s.parar(); }
 });
 
+test('invitado: el armario ofrece login y vuelve al mismo lugar; sin redirecciones a otros sitios', async () => {
+  const s = await arrancar({ MODO_DEMO: 'NO' });
+  try {
+    const http = cliente();
+    const armario = await http(`${s.base}?zona=Z1`);
+    assert.equal(armario.status, 200);
+    const login = `/inventariolab/lab/LABTEST/login?redirect=${encodeURIComponent('/inventariolab/lab/LABTEST?zona=Z1')}`;
+    assert.ok(armario.texto.includes(`href="${login.replace(/&/g, '&amp;')}"`), 'botón de login con regreso al armario');
+
+    // La página de login arma el enlace a Google con ese mismo destino...
+    const pagLogin = await http(`http://127.0.0.1:${new URL(s.base).port}${login}`);
+    assert.ok(pagLogin.texto.includes(encodeURIComponent('/inventariolab/lab/LABTEST?zona=Z1')));
+    // ...y descarta destinos fuera de la app
+    for (const malo of ['https://malo.example/x', '//malo.example', '/\\malo.example', '/inventariolab/x y']) {
+      const r = await http(`http://127.0.0.1:${new URL(s.base).port}/inventariolab/lab/LABTEST/login?redirect=${encodeURIComponent(malo)}`);
+      assert.ok(!r.texto.includes('malo.example') && r.texto.includes(encodeURIComponent('/inventariolab/lab/LABTEST')), malo);
+    }
+  } finally { await s.parar(); }
+});
+
+test('con sesión iniciada, /login vuelve directo al destino (validado)', async () => {
+  const s = await arrancar({ MODO_DEMO: 'SI', DEMO_ROL: 'ADMIN' });
+  try {
+    const http = cliente();
+    await http(s.base); // el modo demo crea la sesión
+    const base = `http://127.0.0.1:${new URL(s.base).port}/inventariolab/lab/LABTEST/login?redirect=`;
+    assert.equal((await http(base + encodeURIComponent('/inventariolab/lab/LABTEST?zona=Z2'))).location, '/inventariolab/lab/LABTEST?zona=Z2');
+    assert.equal((await http(base + encodeURIComponent('https://malo.example'))).location, '/inventariolab/lab/LABTEST');
+  } finally { await s.parar(); }
+});
+
 test('sesiones: se limpian vencidas y corruptas al arrancar', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'invlab-ses-'));
   fs.writeFileSync(path.join(dir, 'vencida.json'), '{"cookie":{"expires":"2020-01-01T00:00:00.000Z"}}');
