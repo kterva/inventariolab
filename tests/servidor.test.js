@@ -160,6 +160,28 @@ test('buscar por foto: exige sesión, rechaza imágenes vacías y el dashboard o
   } finally { await s.parar(); }
 });
 
+test('buscar por foto: la elección se anota sin datos personales y exige sesión', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'invlab-busq-'));
+  let s = await arrancar({ MODO_DEMO: 'NO', BUSQUEDAS_LOG_DIR: dir });
+  try {
+    const sinSesion = await cliente()(`${s.base}/api/buscar-foto/eleccion`, { method: 'POST', body: JSON.stringify({ busquedaId: 'a'.repeat(16), accion: 'ninguno' }) });
+    assert.equal(sinSesion.status, 401);
+  } finally { await s.parar(); }
+
+  s = await arrancar({ MODO_DEMO: 'SI', DEMO_ROL: 'LECTOR', BUSQUEDAS_LOG_DIR: dir });
+  try {
+    const http = cliente();
+    const ok = await http(`${s.base}/api/buscar-foto/eleccion`, { method: 'POST', body: JSON.stringify({ busquedaId: 'a'.repeat(16), accion: 'abrio', articuloId: 'A0001' }) });
+    assert.equal(ok.status, 200);
+    await http(`${s.base}/api/buscar-foto/eleccion`, { method: 'POST', body: JSON.stringify({ busquedaId: 'malo', accion: 'abrio' }) });
+    const lineas = fs.readFileSync(path.join(dir, 'busquedas.jsonl'), 'utf8').trim().split('\n');
+    assert.equal(lineas.length, 1, 'lo mal formado no se anota');
+    const e = JSON.parse(lineas[0]);
+    assert.equal(e.accion, 'abrio'); assert.equal(e.articulo, 'A0001');
+    assert.ok(!('email' in e) && !('usuario' in e));
+  } finally { await s.parar(); }
+});
+
 test('autorizar Drive: solo admins, con estado anti-falsificación, y el permiso queda guardado', async () => {
   const tokens = fs.mkdtempSync(path.join(os.tmpdir(), 'invlab-tokens-'));
   const env = { MODO_DEMO: 'NO', GOOGLE_CLIENT_ID: 'cliente-id', GOOGLE_CLIENT_SECRET: 'secreto', APP_BASE_URL: 'http://127.0.0.1', DRIVE_TOKENS_DIR: tokens };

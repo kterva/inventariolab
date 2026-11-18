@@ -62,6 +62,8 @@ npm start              # o: npm run dev
 | `SESSIONS_DIR` | Carpeta de las sesiones (por defecto `./sessions`). |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Clave JSON de la cuenta de servicio, en una sola línea y entre comillas simples. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Cliente OAuth web para el login. |
+| `BUSQUEDAS_LOG_DIR` | Dónde se anotan las búsquedas por foto (por defecto `./logs-busquedas`, `busquedas.jsonl`, anónimo: sin email ni imagen; se rota a los 5 MB). Sirve para medir aciertos y afinar el umbral. |
+| `AVISO_BUSQUEDAS_MINIMO` | Búsquedas con elección a partir de las cuales los admins ven el aviso "ya se puede verificar" (por defecto 50). Se mide con `npm run medir-busquedas`. |
 | `DRIVE_TOKENS_DIR` | Dónde se guarda el permiso de Drive de los admins (por defecto `./drive-tokens`, modo 700/600, ignorada por git). |
 | `SHEETS_CACHE_TTL_MS` | Cuánto se reutiliza una lectura de la planilla (por defecto 30000). |
 | `SHEETS_CACHE_STALE_MAX_MS` | Si Google falla por cuota o red, hasta qué antigüedad se sirve la última copia buena (por defecto 600000). |

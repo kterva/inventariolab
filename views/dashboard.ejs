@@ -68,6 +68,13 @@
       <p>Hasta que un administrador lo autorice, no se pueden guardar fotos nuevas. Se hace una sola vez, con la cuenta del laboratorio.</p>
     </div>
     <% } %>
+    <% if (typeof avisoMedicion !== 'undefined' && avisoMedicion) { %>
+    <div class="card" id="avisoMedicion" style="cursor:default; border-left:5px solid #2980b9;">
+      <h3>📊 Ya se puede verificar la búsqueda por foto</h3>
+      <p>Hay <%= avisoMedicion.cantidad %> búsquedas con resultado registradas: alcanza para revisar si el umbral de coincidencia está bien y si acierta lo suficiente. En el servidor: <code>npm run medir-busquedas</code> (o pedile a Claude que lo analice).</p>
+      <button style="width:auto; margin:6px 0 0; padding:8px 12px; background:#7f8c8d;" onclick="descartarAvisoMedicion()">Ya lo vi, no avisar más</button>
+    </div>
+    <% } %>
     <div class="card" onclick="showView('search')">
       <h3>🔍 Buscador Global</h3>
       <p>Localiza stock y ubicación por nombre o coincidencia parcial.</p>
@@ -288,7 +295,7 @@
     return '<div class="result-item" style="display:flex; gap:10px; align-items:center;' + (destacada ? 'background:#eafaf1; border-radius:8px; padding:10px;' : '') + '">' +
       (foto ? '<img src="' + esc(foto) + '=w160" alt="" style="width:72px; height:72px; object-fit:cover; border-radius:6px; flex:none;">' : '') +
       '<div style="flex:1; min-width:0;"><strong>' + esc(item.articulo) + '</strong><br><small>📍 ' + esc(ubi || 'Sin ubicación') + '</small></div>' +
-      (link ? '<button style="width:auto; margin:0; padding:8px 12px;" data-href="' + esc(link) + '" onclick="abrirConCarga(this.dataset.href)">Ir al armario →</button>' : '') +
+      (link ? '<button style="width:auto; margin:0; padding:8px 12px;" data-href="' + esc(link) + '" data-id="' + esc(item.id) + '" onclick="abrirConCarga(this.dataset.href); informarEleccion(\'abrio\', this.dataset.id)">Ir al armario →</button>' : '') +
       '</div>';
   }
 
@@ -309,6 +316,7 @@
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error de servidor');
+      busquedaFotoId = data.busquedaId || null;
 
       if (!data.resultados.length) {
         div.innerHTML = '<div class="loader">Todavía no hay fotos guardadas con las que comparar.</div>' + botonNinguno();
@@ -328,7 +336,25 @@
     return '<button style="background:#7f8c8d; margin-top:14px;" onclick="ningunoDeEstos()">Ninguno de estos</button>';
   }
 
+  // Aviso anónimo de qué eligió la persona; sirve para medir si la búsqueda acierta. Nunca estorba.
+  let busquedaFotoId = null;
+  function informarEleccion(accion, articuloId) {
+    if (!busquedaFotoId) return;
+    const id = busquedaFotoId;
+    if (accion === 'ninguno') busquedaFotoId = null;
+    fetch(`/inventariolab/lab/${LAB_ID}/api/buscar-foto/eleccion`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ busquedaId: id, accion, articuloId }), keepalive: true,
+    }).catch(() => {});
+  }
+
+  function descartarAvisoMedicion() {
+    fetch(`/inventariolab/lab/${LAB_ID}/api/buscar-foto/aviso-descartar`, { method: 'POST' }).catch(() => {});
+    const a = document.getElementById('avisoMedicion'); if (a) a.remove();
+  }
+
   function ningunoDeEstos() {
+    informarEleccion('ninguno');
     showView('search');
     const div = document.getElementById('searchResults');
     div.innerHTML = '<div class="loader">Buscalo por nombre.' + (ES_ADMIN ? ' Al encontrarlo, podés guardarle la foto que sacaste.' : '') + '</div>';

@@ -20,3 +20,6 @@ embeddings/
 
 # Permisos de Drive de los admins (refresh tokens): nunca al repo
 drive-tokens/
+
+# Registro de búsquedas por foto (datos de uso)
+logs-busquedas/

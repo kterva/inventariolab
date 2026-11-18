@@ -9,6 +9,7 @@ const FileSessionStore = require('./sessionStore');
 const crypto = require('crypto');
 const driveUsuario = require('./driveUsuario');
 const { crearBuscadorFoto, crearLimitador, ErrorBusquedaFoto } = require('./busquedaFoto');
+const { crearRegistro } = require('./registroBusquedas');
 
 const app = express();
 app.set('trust proxy', 1); // Confiar en el proxy de Nginx
@@ -225,7 +226,8 @@ router.get('/lab/:labId', async (req, res) => {
     email,
     labId,
     driveAutorizado: driveUsuario.estado(labId).autorizado,
-    driveMsg: String(req.query.drive || '')
+    driveMsg: String(req.query.drive || ''),
+    avisoMedicion: permisos.esAdmin && registroBusquedas.listoParaVerificar() ? { cantidad: registroBusquedas.cantidad() } : null
   });
 });
 
@@ -373,6 +375,7 @@ router.get('/lab/:labId/api/buscar', apiAuth, async (req, res) => {
 // Búsqueda por foto: compara con las fotos guardadas y devuelve los 3 más parecidos
 const buscadorFoto = crearBuscadorFoto();
 const permitirBusquedaFoto = crearLimitador(10, 60000);
+const registroBusquedas = crearRegistro({ dir: process.env.BUSQUEDAS_LOG_DIR || undefined });
 
 router.post('/lab/:labId/api/buscar-foto', apiAuth, async (req, res) => {
   try {
@@ -385,13 +388,27 @@ router.post('/lab/:labId/api/buscar-foto', apiAuth, async (req, res) => {
     if (imagen.length > 4 * 1024 * 1024) return res.status(413).json({ error: 'La imagen es demasiado grande.' });
 
     const articulos = await googleClient.articulosConFoto(req.params.labId);
+    const inicio = Date.now();
     const { resultados, coincide, indexados } = await buscadorFoto.buscar(req.params.labId, articulos, imagen, 3);
-    res.json({ resultados, coincide, indexados });
+    const busquedaId = registroBusquedas.busqueda(req.params.labId, { resultados, coincide, indexados }, Date.now() - inicio);
+    res.json({ resultados, coincide, indexados, busquedaId });
   } catch (err) {
     if (err instanceof ErrorBusquedaFoto && err.codigo === 'OCUPADO') return res.status(429).json({ error: err.message });
     console.error('[buscar-foto]', err);
     res.status(500).json({ error: 'No se pudo analizar la foto.' });
   }
+});
+
+// Qué hizo la persona con el resultado (abrió un candidato o "Ninguno de estos"), para medir aciertos
+router.post('/lab/:labId/api/buscar-foto/eleccion', apiAuth, (req, res) => {
+  const { busquedaId, accion, articuloId } = req.body || {};
+  registroBusquedas.eleccion(req.params.labId, { busquedaId, accion, articuloId });
+  res.json({ ok: true });
+});
+
+router.post('/lab/:labId/api/buscar-foto/aviso-descartar', apiAuth, requireAdmin, (req, res) => {
+  registroBusquedas.descartarAviso();
+  res.json({ ok: true });
 });
 
 router.post('/lab/:labId/api/reportar', apiAuth, requireReportar, async (req, res) => {
