@@ -12,6 +12,18 @@ Para un centro, una inspección o una comunidad que quiera **tener su propia ins
 
 > La aplicación se sirve en la subruta **`/inventariolab`** (por ejemplo `https://tu-dominio.edu.uy/inventariolab`). Está fija en el código.
 
+## Qué permisos usa la aplicación y por qué
+
+Conviene tenerlo claro antes de configurar Google, porque es lo que vas a explicarle a tus usuarios.
+
+| Permiso | Quién lo concede | Para qué | Alcance |
+|---|---|---|---|
+| **Nombre y correo** (`profile`, `email`) | cada persona que entra | identificar a la persona y mirar su rol en la hoja `config` | no da acceso al Drive ni al correo |
+| **`drive.file`** | el administrador, una vez por laboratorio | guardar las fotos en su Drive (y, en el modo "laboratorio propio", crear y usar la planilla) | solo archivos que la app crea o que el usuario elige; no ve el resto del Drive |
+| **Cuenta de servicio como Editora** | quien comparte la planilla | leer y escribir la planilla (hoy) | únicamente las planillas que se le comparten |
+
+Las planillas y las fotos son de cada centro, en su Drive. El servidor solo guarda el permiso del administrador, una copia temporal de la planilla, los índices de las fotos y un registro anónimo de las búsquedas por foto.
+
 ## Paso 1. Descargar el código
 
 ```bash

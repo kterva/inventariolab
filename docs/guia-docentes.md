@@ -1,97 +1,144 @@
 # Guía para docentes: tu propio laboratorio en InventarioLab
 
-> **Estado: borrador.** Describe el flujo previsto para las fases 2 a 4 del diseño (ver [`laboratorios-propios.md`](laboratorios-propios.md)). Hoy el alta es manual; los pasos que ya funcionan están en la sección "Mientras tanto". Se actualizará cuando exista el botón "Crear mi laboratorio".
+> **Estado: borrador.** Describe el flujo previsto para las fases 2 a 4 del diseño (ver [`laboratorios-propios.md`](laboratorios-propios.md)). Hoy el alta es manual; los pasos que ya funcionan están en "Mientras tanto". Se publicará cuando exista el botón "Crear mi laboratorio".
 
-InventarioLab guarda el inventario de tu laboratorio en **una planilla de Google Sheets que es tuya**, en tu cuenta de Google. La aplicación solo agrega la búsqueda, los armarios con QR, las fotos y los reportes. No necesitas instalar nada ni saber de informática.
+InventarioLab sirve para llevar el inventario de un laboratorio de un centro educativo: buscar un material, saber en qué armario está, reportar si algo se rompió y ver fotos. No necesitas instalar nada ni saber de informática.
 
-## Qué vas a necesitar
+## Cómo funciona, en pocas palabras
 
-- Una cuenta de Google (puede ser la personal o la del centro).
-- 5 minutos.
-- Un celular para probar los códigos QR.
+**El inventario vive en una planilla de Google Sheets que es tuya**, dentro de tu cuenta de Google. La aplicación es una **comodidad que se apoya en esa planilla**: lee lo que hay, escribe lo que se reporta y agrega la búsqueda, los QR y las fotos. **No es dueña de nada.**
 
-## 1. Crear tu laboratorio (3 minutos)
+```
+   Tu Drive (de tu cuenta de Google)                 Servidor de InventarioLab
+ ┌────────────────────────────────┐   permiso   ┌──────────────────────────────┐
+ │  Planilla "Inventario…"        │ ◄──────────►│  Lee y escribe tu planilla,  │ ◄── tus colegas
+ │  Carpeta "LAB_FOTOS (…)"       │  (el que tú │  y decide qué puede hacer    │     entran con su
+ │  (las fotos)                   │   le diste) │  cada persona (según config) │     cuenta de Google
+ └────────────────────────────────┘             └──────────────────────────────┘
+```
+
+### ¿De quién es la planilla?
+**Tuya.** Se crea en tu Drive, con tu cuenta como dueña. Tú decides con quién compartirla (o no compartirla con nadie). El servicio no tiene ninguna copia propia ni es cotitular.
+
+### ¿La aplicación es un intermediario?
+**Sí, y por eso funciona sin que tus colegas toquen tu Drive.** Cuando alguien de tu equipo busca un material o reporta un problema, el servidor lee o escribe tu planilla **usando el permiso que tú le diste**, y comprueba en la hoja `config` qué puede hacer esa persona (administrar, reportar o solo mirar). Tus colegas **no necesitan acceso a tu planilla ni a tu Drive**: solo entran con su cuenta de Google, y si su correo no está en `config`, no ven nada.
+
+### ¿Qué permisos pide y por qué?
+| Permiso | A quién se le pide | Para qué | Qué **no** permite |
+|---|---|---|---|
+| **Nombre y correo** (inicio de sesión con Google) | A todas las personas que entran | Saber quién eres y comprobar que tu correo está en `config` | No da acceso a tu Drive, tu correo ni tus contactos |
+| **"Ver, editar, crear y borrar solo los archivos de Drive que uses con esta app"** (`drive.file`) | **Solo a quien crea o conecta el laboratorio** (el administrador) | Crear la planilla y la carpeta de fotos, leer y escribir la planilla, y guardar las fotos | **No ve ningún otro archivo de tu Drive.** Solo alcanza lo que la app crea o lo que tú le muestras en la ventana de elegir archivo |
+
+El segundo permiso es el más pequeño que ofrece Google para esto, y se puede quitar cuando quieras (ver "Si cambias de centro").
+
+### ¿Dónde se guardan las fotos?
+**En tu Drive**, en una carpeta que crea la aplicación: **"LAB_FOTOS (InventarioLab)"**. Ocupan **tu** espacio de Drive. Para poder mostrarse en la aplicación, cada foto queda **visible para cualquiera que tenga su enlace** (el enlace es largo y no se puede adivinar, pero no es privado). **No subas fotos de personas ni información sensible.**
+
+Por otro lado, la foto que alguien saca **para buscar** un material se analiza en el servidor y **no se guarda**.
+
+### ¿Puedo usar la planilla sin la aplicación?
+**Sí.** La planilla es una planilla de Google común y sigue siendo tuya si dejas de usar la aplicación, si el servicio cambia o si desaparece:
+
+- Todos tus datos están ahí: materiales, cantidades, armarios, historial y usuarios.
+- Puedes abrirla, editarla y descargarla como Excel (**Archivo → Descargar**).
+- Las fotos siguen en tu Drive, y los enlaces de la planilla siguen abriéndolas.
+- Lo único que deja de funcionar sin la aplicación son las funciones que dependen de ella: la búsqueda, los reportes desde el celular y los **códigos QR**, que abren una dirección de la aplicación.
+
+Los cambios que hagas a mano en la planilla aparecen en la aplicación en menos de un minuto.
+
+### ¿Qué guarda el servidor?
+Solo lo necesario para funcionar:
+
+- el **permiso** que le diste, para poder leer y escribir tu planilla;
+- una **copia temporal** de la planilla, de 30 segundos (hasta 10 minutos si Google falla un momento), para responder rápido;
+- una **representación numérica de cada foto** (no la imagen) para la búsqueda por foto;
+- un **registro anónimo** de las búsquedas por foto (qué materiales propuso y qué eligió la persona, **sin correo ni imagen**), para mejorar la búsqueda.
+
+No guarda tu inventario, ni tus usuarios, ni tus fotos. Si quieres, puedes pedir que borre todo eso (ver "Si cambias de centro").
+
+---
+
+## Paso a paso
+
+### 1. Crear tu laboratorio (3 minutos)
 
 1. Entra a la dirección de InventarioLab que te dio tu centro o tu inspector.
 2. Toca **Entrar con Google** y elige tu cuenta.
+   > *Qué pasa:* Google le da a la aplicación tu **nombre y correo**. Nada más.
 3. Toca **Crear mi laboratorio**.
-4. Google te va a mostrar una pantalla de permisos que dice: *"Ver, editar, crear y borrar solo los archivos específicos de Google Drive que uses con esta app"*. Es el permiso mínimo: la aplicación **solo puede tocar lo que ella misma crea o lo que tú le muestres**; no ve el resto de tu Drive. Toca **Continuar**.
+4. Google muestra una pantalla de permisos: *"Ver, editar, crear y borrar solo los archivos específicos de Google Drive que uses con esta app"*. Toca **Continuar**.
+   > *Qué pasa:* le das el permiso `drive.file`. La aplicación **no ve** el resto de tu Drive. Si pasa algo y quieres retirarlo, ve a https://myaccount.google.com/permissions.
 5. Escribe el nombre del centro y del laboratorio, y toca **Crear**.
+   > *Qué pasa:* la aplicación crea **en tu Drive** la planilla "Inventario de laboratorio" (con sus hojas ya preparadas) y la carpeta "LAB_FOTOS (InventarioLab)". Te agrega como **administrador** en la hoja `config`. El servidor guarda el permiso para poder trabajar con esos archivos.
 
-La aplicación crea en **tu Drive**:
-- la planilla **"Inventario de laboratorio"**, con las hojas ya preparadas;
-- la carpeta **"LAB_FOTOS (InventarioLab)"**, donde se guardarán las fotos.
+Al terminar aparece la dirección de tu laboratorio: guárdala o agrégala a la pantalla de inicio del celular.
 
-Tú quedas como **administrador**. La dirección de tu laboratorio aparece al terminar: guárdala o tócala para agregarla a la pantalla de inicio del celular.
+### 2. Cargar tus materiales
 
-## 2. Cargar tus materiales
-
-Tienes dos caminos:
-
-**A. Empezar de cero.** Abre la planilla desde tu Drive y completa la hoja **INVENTARIO**: un material por fila (nombre, cantidades en buen estado, regular y roto, y en qué armario está). No toques la columna **ID**: la completa la aplicación sola.
+**A. Empezar de cero.** Abre la planilla desde tu Drive y completa la hoja **INVENTARIO**: un material por fila (nombre, cantidades en buen estado, regular y roto, y el armario). **No toques la columna ID**: la completa la aplicación sola.
 
 **B. Traer lo que ya tienes.** Si ya tienes un inventario en otra planilla:
 1. En tu laboratorio, toca **Importar una planilla**.
-2. Elige tu planilla en la ventana de Google. La aplicación solo la **lee**; tu planilla original no se modifica.
+2. En la ventana de Google, elige tu planilla.
+   > *Qué pasa:* al elegirla, le das a la aplicación permiso **solo sobre ese archivo**. La aplicación únicamente la **lee**; **tu planilla original no se modifica**.
 3. Indica qué columna es el nombre, cuáles son las cantidades y cuál el armario.
-4. Revisa la vista previa y confirma. Se crea una planilla nueva con tus datos ordenados.
+4. Revisa la vista previa y confirma.
+   > *Qué pasa:* se crea una planilla **nueva** (en tu Drive) con tus datos ordenados. La original queda como estaba.
 
-## 3. Armarios y códigos QR
+### 3. Armarios y códigos QR
 
-1. En el panel de administración, entra a **Gestión de zonas** y agrega tus armarios (por ejemplo "Armario 1", "Bajo mesada").
+1. En el panel de administración, entra a **Gestión de zonas** y agrega tus armarios (por ejemplo "Armario 1" o "Bajo mesada").
 2. Asigna cada material a su armario.
-3. Toca **Impresión de QR**, elige los armarios y **imprime las etiquetas**. Pégalas en cada armario.
+3. Toca **Impresión de QR**, elige los armarios e **imprime las etiquetas**. Pégalas en cada armario.
+   > *Qué pasa:* la aplicación agrega a tu planilla una hoja **IMPRIMIR_QR** con las etiquetas. Cada QR contiene la dirección del armario **dentro de la aplicación**.
 4. Prueba con el celular: al escanear un QR debe abrir el contenido de ese armario.
 
-## 4. Invitar a tus colegas
+### 4. Invitar a tus colegas
 
-Los demás usuarios **no necesitan acceso a tu planilla ni a tu Drive**. Se agregan en la hoja **config** de la planilla, en las columnas A y B:
+Se agregan en la hoja **config** de la planilla, columnas A y B:
 
 | Columna A: correo | Columna B: rol |
 |---|---|
 | colega@centro.edu.uy | USER |
 | otra.persona@gmail.com | ADMIN |
 
-- **ADMIN:** puede subir fotos, mover materiales y gestionar armarios y QR.
-- **USER:** puede buscar y reportar incidencias.
+- **ADMIN:** sube fotos, mueve materiales y gestiona armarios y QR.
+- **USER:** busca y reporta incidencias.
 - **VISOR:** solo mira.
 
-Cada persona entra con su cuenta de Google. Si su correo no está en la lista, no ve nada.
+> *Qué pasa:* cada persona entra con su cuenta de Google y la aplicación mira esa lista. **No hace falta compartirles tu planilla.** Cuando alguien reporta o cambia algo, la aplicación anota en tu hoja **HISTORIAL** la fecha, **su correo** y la acción, para que el centro sepa quién hizo cada cambio.
 
-## 5. Fotos y búsqueda por foto
+### 5. Fotos y búsqueda por foto
 
 - Un administrador abre un material y toca **Guardar mi foto en este artículo**.
-- Con fotos cargadas, cualquiera puede tocar **Buscar por foto**, sacar una foto de un material y ver en qué armario está. La foto que se usa para buscar **no se guarda**.
-- Las fotos de los materiales quedan visibles para cualquiera que tenga su enlace: **no subas fotos de personas ni información sensible**.
+  > *Qué pasa:* la foto se guarda **en tu Drive**, en la carpeta "LAB_FOTOS (InventarioLab)", y su enlace se anota en la columna de fotos de la planilla.
+- Con fotos cargadas, cualquiera puede tocar **Buscar por foto**, sacar una foto de un material y ver en qué armario está.
+  > *Qué pasa:* la foto se compara en el servidor con las de tu inventario y **no se guarda**.
 
-## 6. Llevarte tus datos
+### 6. Llevarte tus datos
 
-- **Planilla:** ábrela en tu Drive. Es tuya: puedes descargarla como Excel (**Archivo → Descargar**).
-- **Con fotos:** en el panel, toca **Exportar todo** para descargar la planilla en Excel y un ZIP con las fotos.
+- **La planilla:** ábrela en tu Drive. Descárgala como Excel con **Archivo → Descargar**.
+- **Todo junto:** en el panel, toca **Exportar todo** para bajar la planilla en Excel y un ZIP con las fotos.
 
-## 7. Si cambias de centro o dejas de usarlo
+### 7. Si cambias de centro o dejas de usarlo
 
-- **Pasar el laboratorio a otra persona:** la persona entra con su cuenta, toca **Conectar este laboratorio** y elige la misma planilla, que tú debes haberle compartido antes. La conexión pasa a su cuenta.
-- **Desconectar:** en el panel, toca **Desconectar y borrar mis datos del servidor**. Se borran el permiso, la caché y los índices de fotos del servidor. **Tu planilla y tus fotos no se tocan**: siguen en tu Drive.
-- **Quitar el permiso desde Google:** https://myaccount.google.com/permissions → InventarioLab → **Quitar acceso**.
+- **Pasar el laboratorio a otra persona:** la otra persona entra con su cuenta, toca **Conectar este laboratorio** y elige la misma planilla (que tú debes haberle compartido antes). La conexión pasa a su cuenta.
+- **Desconectar:** en el panel, toca **Desconectar y borrar mis datos del servidor**. Se borran el permiso, la copia temporal y los índices de fotos del servidor. **Tu planilla y tus fotos no se tocan:** siguen en tu Drive.
+- **Quitar el permiso desde Google:** https://myaccount.google.com/permissions → InventarioLab → **Quitar acceso**. La aplicación deja de poder leer o escribir; tus archivos quedan igual.
 
-## Qué guarda el servidor y qué no
-
-| Lo guarda el servidor | Lo guardas tú, en tu Drive |
-|---|---|
-| El permiso que le diste (para poder leer y escribir tu planilla), una copia temporal de la planilla de pocos minutos, una representación numérica de cada foto (no la imagen) y un registro anónimo de las búsquedas por foto (sin tu correo ni la imagen). | La planilla, las fotos, los usuarios y roles, y el historial de cambios. |
-
-Más detalles en la página de privacidad de la aplicación.
+---
 
 ## Mientras tanto: cómo se da de alta hoy (manual)
 
-Hasta que exista el botón "Crear mi laboratorio", el alta se hace con la ayuda de quien administra el servicio:
+Hasta que exista el botón "Crear mi laboratorio", el alta se hace con ayuda de quien administra el servicio. **Hoy el modelo es distinto**: el servicio usa una *cuenta de servicio* (una cuenta técnica de Google) con la que tú compartes la planilla.
 
 1. Crea una planilla de Google Sheets con las hojas **INVENTARIO**, **ubicaciones** y **config** (la estructura está en el README del proyecto).
 2. En **config**, escribe tu correo en la columna A y `ADMIN` en la B.
-3. Comparte la planilla, como **Editor**, con el correo de la cuenta de servicio que te indique quien administra el servicio.
+3. Comparte la planilla, como **Editor**, con el correo de la cuenta de servicio que te indique quien administra el servicio. *(Con esto la cuenta de servicio puede leer y escribir **esa** planilla; no ve nada más de tu Drive.)*
 4. Abre `<dirección del servicio>/inventariolab/lab/<ID de tu planilla>` (el ID es el tramo largo de la dirección de tu planilla, entre `/d/` y `/edit`).
-5. Entra con Google y, en el panel, toca **Autorizar Drive para guardar fotos** (una sola vez).
+5. Entra con Google y, en el panel, toca **Autorizar Drive para guardar fotos** (una sola vez). *(Aquí das el permiso `drive.file`; las fotos van a una carpeta de tu Drive.)*
+
+La planilla sigue siendo tuya, y las fotos están en tu Drive, igual que en el flujo nuevo.
 
 ## Problemas frecuentes
 
@@ -100,4 +147,5 @@ Hasta que exista el botón "Crear mi laboratorio", el alta se hace con la ayuda 
 | "No tienes acceso" al entrar | Tu correo no está en la hoja **config**. Pídele a un administrador que lo agregue. |
 | Las fotos no se guardan | El permiso de Drive venció o fue revocado: un administrador debe tocar **Autorizar Drive** (o **Conectar este laboratorio**) otra vez. |
 | Un cambio hecho a mano en la planilla no aparece | La aplicación se actualiza sola en menos de un minuto. Si no, recarga la página. |
-| Borré o reordené filas y se mezclaron datos | No borres ni edites la columna **ID**. Ordenar, insertar y borrar filas es seguro mientras el ID no se toque. |
+| Se mezclaron datos tras borrar o reordenar filas | No borres ni edites la columna **ID**. Ordenar, insertar y borrar filas es seguro mientras el ID no se toque. |
+| Los QR no abren nada | Los QR apuntan a la aplicación: si el servicio está caído o cambió de dirección, no abren. La planilla y las fotos siguen intactas. |
