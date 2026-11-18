@@ -71,6 +71,8 @@ npm start              # o: npm run dev
 
 ### Configurar Google Cloud
 
+Para una instalación completa, paso a paso, ver [`docs/instalacion-propia.md`](docs/instalacion-propia.md). Para que un docente use su propio laboratorio, [`docs/guia-docentes.md`](docs/guia-docentes.md) (borrador) y el diseño en [`docs/laboratorios-propios.md`](docs/laboratorios-propios.md).
+
 1. Crear un proyecto y habilitar **Google Sheets API** y **Google Drive API**.
 2. Crear una **cuenta de servicio** sin roles en el proyecto y una **clave JSON**; cargarla en `GOOGLE_SERVICE_ACCOUNT_JSON`. Se usa para leer y escribir las planillas, **no para guardar fotos**.
 3. En **Google Auth Platform**: completar la marca (página principal, política de privacidad, dominio autorizado; **sin logo**, para no requerir verificación), crear un **cliente OAuth web** y **publicar la app** ("En producción"; en "Testing" el permiso de Drive de los admins caduca a los 7 días y las subidas de fotos vuelven a fallar). Registrar **dos URI de redirección**:
