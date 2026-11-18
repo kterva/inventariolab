@@ -11,12 +11,14 @@ Navegador ──► Cloudflare ──► nginx ──► Node.js/Express (PM2)
                                           │  caché en memoria (30 s)
                                           ▼
                          Google Sheets (planilla de cada liceo)
-                         Google Drive  (carpeta LAB_FOTOS)
+                         Google Drive  (fotos, en el Drive de un admin)
 ```
 
 - Cada laboratorio se identifica por el **ID de su planilla**: `/inventariolab/lab/<ID>`.
 - La app accede a las planillas con una **cuenta de servicio** de Google. Cada liceo comparte su planilla con el email de esa cuenta como **Editor**; la portada y la pantalla de error muestran cuál es.
 - Los usuarios inician sesión con **Google OAuth** (solo nombre y email).
+- Las **fotos las sube un administrador con su propia cuenta** (OAuth, alcance `drive.file`), no la cuenta de servicio: las cuentas de servicio no tienen cuota de almacenamiento en Drive y Google no las deja ser dueñas de archivos. Un admin toca "Autorizar Drive" una vez en el panel; las fotos van a la carpeta `LAB_FOTOS (InventarioLab)` de su Drive.
+- La **búsqueda por foto** corre en el propio servidor (sin servicios externos): compara la foto con las de los artículos mediante embeddings de imagen.
 
 ### La planilla
 
@@ -68,9 +70,14 @@ npm start              # o: npm run dev
 ### Configurar Google Cloud
 
 1. Crear un proyecto y habilitar **Google Sheets API** y **Google Drive API**.
-2. Crear una **cuenta de servicio** sin roles en el proyecto y una **clave JSON**; cargarla en `GOOGLE_SERVICE_ACCOUNT_JSON`.
-3. En **Google Auth Platform**: completar la marca (página principal, política de privacidad, dominio autorizado; **sin logo**, para no requerir verificación), crear un **cliente OAuth web** con la URI de redirección `<APP_BASE_URL>/inventariolab/auth/google/callback` y **publicar la app**. Como solo pide nombre y email, no necesita verificación de Google.
+2. Crear una **cuenta de servicio** sin roles en el proyecto y una **clave JSON**; cargarla en `GOOGLE_SERVICE_ACCOUNT_JSON`. Se usa para leer y escribir las planillas, **no para guardar fotos**.
+3. En **Google Auth Platform**: completar la marca (página principal, política de privacidad, dominio autorizado; **sin logo**, para no requerir verificación), crear un **cliente OAuth web** y **publicar la app** ("En producción"; en "Testing" el permiso de Drive de los admins caduca a los 7 días y las subidas de fotos vuelven a fallar). Registrar **dos URI de redirección**:
+   - `<APP_BASE_URL>/inventariolab/auth/google/callback` (login);
+   - `<APP_BASE_URL>/inventariolab/auth/drive/callback` (autorización de Drive para guardar fotos).
+
+   Como solo se piden nombre y email (login) y el alcance `drive.file` (archivos creados por la propia app), no hace falta verificación de Google.
 4. Compartir cada planilla con el email de la cuenta de servicio como **Editor**.
+5. Un administrador del laboratorio entra a la app y toca **"Autorizar Drive para guardar fotos"** (una sola vez por laboratorio). Sin este paso todo funciona salvo guardar fotos nuevas, y la app avisa "Un admin debe autorizar Drive".
 
 Las claves nunca van al repositorio: `.gitignore` excluye `.env`, las claves de cuentas de servicio y los `client_secret*.json`.
 
@@ -85,7 +92,9 @@ No llaman a Google: `tests/fake-googleapis.js` simula la API.
 - `cache.test.js`: caché, invalidación, errores de Google y roles.
 - `escrituras.test.js`: IDs fijos, hoja `HISTORIAL`, escrituras tras reordenar filas, reportes simultáneos y reintentos.
 - `escapado.test.js`: renderiza las vistas con datos maliciosos y verifica que se muestren como texto.
-- `servidor.test.js`: levanta el servidor real y prueba cada rol (vía modo demo) y la persistencia de sesiones.
+- `servidor.test.js`: levanta el servidor real y prueba cada rol (vía modo demo), la persistencia de sesiones y el flujo de autorización de Drive.
+- `busquedaFoto.test.js`: índice de embeddings (con un "modelo" falso), persistencia, cola, límite por usuario y descarga solo desde hosts de Google.
+- `driveUsuario.test.js`: permiso de Drive de los admins (guardado con modo 600, estado, errores) y subida de fotos con él.
 
 ## Despliegue
 
@@ -98,6 +107,8 @@ pm2 restart inventariolab --update-env
 ```
 
 Las sesiones se guardan en archivos, así que reiniciar no cierra la sesión de los usuarios. Cambiar `SESSION_SECRET` sí las invalida todas.
+
+Estas carpetas del servidor **se conservan entre despliegues** y no están en el repo: `sessions/`, `drive-tokens/` (permiso de Drive de los admins; si se pierde, un admin vuelve a tocar "Autorizar Drive") y `embeddings/` (índice de la búsqueda por foto; se regenera solo). La primera búsqueda por foto de un laboratorio descarga el modelo y calcula todos los embeddings (del orden de un minuto en un VPS chico); conviene precalentarla tras el primer despliegue.
 
 ## Estructura
 
@@ -143,6 +154,19 @@ Reescritura sobre **Node.js + Express** para resolver los límites de velocidad 
 ### Versión 1.x (Google Apps Script)
 Desarrollada 100 % sobre Google Apps Script, que servía el HTML y usaba la planilla como base de datos. Era fácil de instalar, pero lenta y con fallos por cuotas cuando varios docentes escaneaban QR o subían fotos a la vez.
 
+## Lecciones aprendidas
+
+- **Una función migrada no está terminada hasta probarla de punta a punta.** La subida de fotos se reescribió al pasar a Node pero nunca se probó con éxito: hasta entonces las fotos las subía el Apps Script con la cuenta del docente. Falló recién cuando alguien la usó. Al migrar, listar todo lo que hacía la versión anterior y probar cada cosa en producción.
+- **Las cuentas de servicio no tienen cuota en Drive** (error `Service Accounts do not have storage quota`). Compartirles una carpeta no alcanza: el archivo sigue siendo suyo. Opciones: unidades compartidas (solo Google Workspace) o subir con OAuth de un usuario. El alcance `drive.file` limita el permiso a los archivos que crea la propia app.
+- **Un error de Google no siempre es lo que dice el código.** Conviene reproducirlo contra la API con una consulta mínima (subir un archivo de prueba, listar permisos, leer `storageQuota`) antes de cambiar código.
+- **Mirar los datos antes de suponer.** Quién creó y modificó cada foto (`owners`, `lastModifyingUser`) mostró que ninguna la había subido la cuenta de servicio; los nombres de archivo no sirven, porque Node y Apps Script usaban el mismo formato.
+- **Medir antes de implementar.** La búsqueda por foto se eligió comparando modelos sobre fotos reales de los usuarios; los resultados iniciales de modelos grandes eran engañosos por una cuantización y un agrupamiento mal elegidos. Las pruebas "foto del mismo artículo" tienen que usar fotos nuevas, no las guardadas.
+- **No poner datos de operación ni fotos de prueba en un repo público.** Las fotos de prueba se excluyen con `.git/info/exclude`, y los tokens y embeddings con `.gitignore`.
+- **Los permisos de OAuth en modo "Testing" caducan a los 7 días.** Publicar la app antes de depender de refresh tokens.
+- **En una migración de propiedad de una planilla con Apps Script ligado, no hacer una copia**: la copia crea un script nuevo con implementaciones nuevas y rompe los QR impresos. Transferir la propiedad conserva los IDs.
+
 ## Pendientes conocidos
 
+- Cada laboratorio nuevo necesita que un administrador autorice Drive una vez. Las fotos quedan en el Drive de esa cuenta.
+- La búsqueda por foto solo reconoce artículos que ya tienen foto, y su acierto se midió con pocas fotos (8 de 10 entre los 3 primeros). Conviene volver a medir con más fotos.
 - La vista del armario muestra el último evento de `HISTORIAL`; las ediciones hechas a mano en la planilla siguen yendo a la columna J (si la planilla tiene el script de Apps Script) y solo se muestran cuando el artículo no tiene eventos en `HISTORIAL`.

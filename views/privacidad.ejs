@@ -42,7 +42,9 @@
     <ul>
       <li><strong>Inicio de sesión con Google:</strong> solo pedimos tu <strong>dirección de email</strong> y los datos básicos de tu perfil. Usamos el email para saber quién sos y verificar si estás autorizado en la planilla del laboratorio. No accedemos a tu Gmail, tu Drive ni a ningún otro dato de tu cuenta.</li>
       <li><strong>Registro de cambios:</strong> cuando reportás un problema, movés un artículo o subís una foto, se anota en la planilla del laboratorio la fecha, tu email y la acción realizada, para que el centro sepa quién hizo cada cambio.</li>
-      <li><strong>Fotos de materiales:</strong> las fotos que suben los administradores se guardan en una carpeta de Google Drive asociada a la planilla del laboratorio. Para poder mostrarlas en la aplicación, quedan <strong>visibles para cualquier persona que tenga el enlace</strong>. No subas fotos de personas ni de información sensible.</li>
+      <li><strong>Fotos de materiales:</strong> las fotos que suben los administradores se guardan en una carpeta de Google Drive de la cuenta del administrador que autorizó el acceso a Drive (una carpeta que crea la propia aplicación). Para poder mostrarlas en la aplicación, quedan <strong>visibles para cualquier persona que tenga el enlace</strong>. No subas fotos de personas ni de información sensible.</li>
+      <li><strong>Autorización de Drive (solo administradores):</strong> para guardar fotos, un administrador autoriza a la aplicación a crear y gestionar <strong>únicamente los archivos que ella misma crea</strong> en su Drive; no puede ver el resto de sus archivos. El permiso queda guardado en el servidor y puede revocarse en cualquier momento desde la configuración de la cuenta de Google.</li>
+      <li><strong>Búsqueda por foto:</strong> la foto que se saca para buscar se analiza en el servidor, se compara con las fotos de los materiales y <strong>no se guarda</strong>. Para poder comparar, el servidor guarda una representación numérica (no una imagen) de cada foto de material.</li>
       <li><strong>Cookie de sesión:</strong> una cookie mantiene tu sesión abierta hasta por 30 días o hasta que cierres sesión.</li>
       <li><strong>En tu dispositivo:</strong> la aplicación recuerda en tu navegador el último laboratorio que abriste, para entrar directo la próxima vez.</li>
     </ul>
@@ -50,8 +52,8 @@
 
   <div class="section">
     <h2>Dónde se guardan</h2>
-    <p>Los datos del inventario y el registro de cambios están en la planilla y la carpeta de Google Drive del centro educativo, no en el servidor de InventarioLab.</p>
-    <p>El servidor, ubicado en Alemania, solo guarda la sesión de cada usuario y una copia temporal de la planilla durante unos minutos, para responder más rápido. No mantiene una base de datos propia con tus datos.</p>
+    <p>Los datos del inventario y el registro de cambios están en la planilla del centro y en el Google Drive de la cuenta que administra el laboratorio, no en el servidor de InventarioLab.</p>
+    <p>El servidor, ubicado en Alemania, solo guarda la sesión de cada usuario, una copia temporal de la planilla durante unos minutos (para responder más rápido), el permiso de Drive del administrador y las representaciones numéricas de las fotos para la búsqueda por foto. No mantiene una base de datos propia con tus datos.</p>
   </div>
 
   <div class="section">
@@ -66,7 +68,7 @@
 
   <div class="section">
     <h2>Cuánto tiempo se conservan</h2>
-    <p>La sesión dura hasta 30 días. Los datos de la planilla y las fotos se conservan mientras el centro educativo los mantenga en su Google Drive. El centro puede editarlos o borrarlos en cualquier momento.</p>
+    <p>La sesión dura hasta 30 días. Los datos de la planilla y las fotos se conservan mientras el centro educativo los mantenga en su Google Drive. Las representaciones numéricas de las fotos se recalculan o eliminan cuando cambia o se borra la foto. El centro puede editarlos o borrarlos en cualquier momento.</p>
   </div>
 
   <div class="section">

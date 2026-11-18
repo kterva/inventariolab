@@ -85,30 +85,30 @@
     <div class="step">
       <div class="step-number">1</div>
       <div class="step-content">
-        <b>Crear la Carpeta:</b> Ve a tu Google Drive y crea una carpeta nueva (Ej: <i>"Inventario de Física"</i>). <b>¿Para qué?</b> Esta carpeta actuará como el "disco duro" exclusivo de tu laboratorio, donde se guardarán de forma organizada las fotos de todos tus materiales para no mezclarse con tus archivos personales.
+        <b>Copiar la Planilla:</b> Haz clic en el enlace "Crear una copia de la Planilla Modelo" desde la pantalla principal. La copia queda en tu Google Drive.
       </div>
     </div>
     <div class="step">
       <div class="step-number">2</div>
       <div class="step-content">
-        <b>Compartir con el Servidor:</b> Haz clic derecho en la carpeta, dale a <i>Compartir</i>, y compártela como <b>Editor</b> con el correo de servicio oficial que aparece en la pantalla principal. <br><b>¿Qué es este correo y por qué compartirlo?</b> Es un "robot" automatizado alojado en un servidor seguro. Al compartirle la carpeta, le das permiso ÚNICAMENTE para guardar allí adentro las fotos de tu inventario. El sistema no puede leer ni acceder a nada más de tu Google Drive personal. ¡Tus datos están seguros!
+        <b>Compartir con el Servidor:</b> Abre la planilla copiada, dale a <i>Compartir</i>, y compártela como <b>Editor</b> con el correo de servicio oficial que aparece en la pantalla principal. <br><b>¿Qué es este correo y por qué compartirlo?</b> Es un "robot" automatizado alojado en un servidor seguro. Al compartirle la planilla, le das permiso para leer y escribir <b>solamente en esa planilla</b> (el inventario, los reportes y el historial). No puede ver nada más de tu Google Drive.
       </div>
     </div>
     <div class="step">
       <div class="step-number">3</div>
       <div class="step-content">
-        <b>Copiar la Planilla:</b> Haz clic en el enlace "Crear una copia de la Planilla Modelo" desde la pantalla principal.
+        <b>Configurar:</b> En la planilla, ve a la pestaña inferior que dice <code>config</code> y en la columna de correos pon <b>tu propio correo</b> con el rol <code>ADMIN</code>.
       </div>
     </div>
     <div class="step">
       <div class="step-number">4</div>
       <div class="step-content">
-        <b>Mover y Configurar:</b> Ve a tu Google Drive, mueve la planilla recién copiada hacia <b>adentro</b> de la carpeta que creaste (esto garantiza que las fotos del inventario se guarden organizadas junto a tu planilla). Luego ábrela, ve a la pestaña inferior que dice <code>config</code>, y en la columna de correos pon <b>tu propio correo</b>.
+        <b>Autorizar Drive para las fotos:</b> Copia el enlace (URL) de la planilla, pégalo en la pantalla principal de InventarioLab e ingresa como ADMIN. En el Panel de Control toca <b>"🔑 Autorizar Drive para guardar fotos"</b> y acepta el permiso de Google. Se hace <b>una sola vez</b>.<br><b>¿Por qué hace falta?</b> El "robot" no tiene espacio propio en Google Drive, así que las fotos las guarda tu cuenta. La aplicación crea una carpeta llamada <i>LAB_FOTOS (InventarioLab)</i> en tu Drive y solo puede ver y modificar los archivos que ella misma crea; no puede leer el resto de tu Drive.
       </div>
     </div>
     
     <div class="alert">
-      <b>¡Listo!</b> Ahora solo copia el enlace (URL) de esa planilla y pégalo en la pantalla principal de InventarioLab para generar tu link mágico de acceso.
+      <b>¡Listo!</b> Desde ahí puedes buscar materiales, crear armarios y subir fotos. Si no autorizas Drive, todo funciona menos guardar fotos nuevas.
     </div>
   </div>
 
@@ -123,7 +123,7 @@
       </tr>
       <tr>
         <td><b>ADMIN</b></td>
-        <td>Tiene control total. Puede ver el botón de Inicio, explorar todos los armarios, agregar nuevas zonas y mandar a generar los Códigos QR para imprimir.</td>
+        <td>Tiene control total. Puede ver el botón de Inicio, explorar todos los armarios, mover artículos, <b>subir fotos</b>, agregar nuevas zonas y mandar a generar los Códigos QR para imprimir.</td>
       </tr>
       <tr>
         <td><b>USER</b> (o cualquier otro valor, como LECTOR)</td>
@@ -156,7 +156,7 @@
     <h3>Columnas Opcionales</h3>
     <ul>
       <li><b>Ubicación:</b> Escribe exactamente el nombre del armario donde está guardado (Ej: <i>Armario Sur 1</i>). Debe coincidir con las Zonas creadas.</li>
-      <li><b>Link a Imagen:</b> Pega una URL de una imagen de internet, o aún mejor, un enlace a una imagen guardada en tu misma carpeta compartida de Google Drive. El sistema la mostrará en miniatura.</li>
+      <li><b>Link a Imagen:</b> Se completa sola cuando un administrador sube una foto desde el armario o desde el buscador. También puedes pegar la URL (<code>https://</code>) de una imagen de internet, pero la <b>búsqueda por foto</b> solo reconoce las fotos subidas desde la aplicación.</li>
     </ul>
   </div>
 
@@ -182,6 +182,15 @@
     
     <h3>Búsqueda Manual</h3>
     <p>Cualquier profesor puede usar el <b>Buscador Global</b>. Solo escribe una palabra clave (Ej: <i>"Lupa"</i>) y el sistema te dirá instantáneamente si hay stock, si están rotos, y en qué armario buscar.</p>
+
+    <h3>Búsqueda por Foto</h3>
+    <p>Si no recuerdas cómo se llama un material, toca <b>📸 Buscar por foto</b> en el Panel de Control y sácale una foto. El sistema la compara con las fotos ya guardadas y te muestra <b>cuál parece ser</b> y en qué armario está, con un botón <b>Ir al armario</b>. Si no está seguro, te muestra los 3 más parecidos para que elijas.</p>
+    <div class="info">
+      Solo reconoce materiales que <b>ya tienen foto</b>. Si ninguno es el correcto, toca <b>"Ninguno de estos"</b>: te lleva al buscador por nombre y, si eres administrador, al encontrarlo puedes <b>guardarle la foto que sacaste</b> para que la próxima vez se reconozca. La foto que usas para buscar no se guarda.
+    </div>
+
+    <h3>Subir una Foto (ADMIN)</h3>
+    <p>Dentro de un armario, cada artículo tiene el botón <b>📸 Foto</b>. La miniatura aparece enseguida para confirmar que se subió. Si ves el aviso <i>"Un admin debe autorizar Drive"</i>, falta el paso 4 de la instalación.</p>
 
     <h3>Escaneo de QR (Modo Armario)</h3>
     <p>Cuando un docente abre un armario, solo tiene que abrir la cámara de su celular y apuntar al Código QR pegado en la puerta.</p>
