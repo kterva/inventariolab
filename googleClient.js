@@ -26,17 +26,31 @@ function getAuthClient() {
   return auth;
 }
 
+const MSG_CONEXION_VENCIDA = 'La conexión del laboratorio con Google venció o fue revocada: un administrador debe volver a conectarlo.';
+const errConexionVencida = () => Object.assign(new Error(MSG_CONEXION_VENCIDA), { codigo: 'CONEXION_VENCIDA' });
+
 // ─── CLIENTE ÚNICO ─────────────────────────────────────
 // Se crea una sola vez por proceso: así GoogleAuth reutiliza el token de la
 // cuenta de servicio en vez de pedir uno nuevo en cada consulta.
 let _apis = null;
-function getApis() {
+function apisDeServicio() {
   if (_apis) return _apis;
   const auth = getAuthClient();
   _apis = auth
     ? { sheets: google.sheets({ version: 'v4', auth }), drive: google.drive({ version: 'v3', auth }) }
     : { sheets: null, drive: null };
   return _apis;
+}
+
+/**
+ * Clientes de Google para un laboratorio. Si el laboratorio se maneja con el
+ * permiso de su dueño (modo usuario), se usa ese permiso; si no, la cuenta de
+ * servicio. Cada laboratorio recibe solo sus propias credenciales.
+ */
+function getApis(labId) {
+  const sheets = labId ? driveUsuario.clienteSheets(labId) : null;
+  if (sheets) return { sheets, drive: driveUsuario.clienteDrive(labId) };
+  return apisDeServicio();
 }
 
 // ─── CACHÉ DE LECTURA ──────────────────────────────────
@@ -91,6 +105,7 @@ async function conReintentos(fn, etiqueta = 'llamada a Google') {
     try {
       return await fn();
     } catch (err) {
+      if (/invalid_grant/i.test((err && err.message) || '')) throw errConexionVencida();
       if (intento >= REINTENTOS || !esTransitorio(err)) throw err;
       const ms = Math.round(BACKOFF_MS * 2 ** intento * (0.5 + Math.random()));
       console.warn(`[reintento] ${etiqueta} falló (${err.message}); intento ${intento + 2} en ${ms} ms`);
@@ -104,12 +119,13 @@ const _cache = new Map();
 
 function esErrorDeAcceso(err) {
   const msg = (err && err.message) || '';
-  return msg.includes('Requested entity was not found') || msg.includes('permission') || msg.includes('unregistered');
+  return msg.includes('Requested entity was not found') || msg.includes('permission') || msg.includes('unregistered') || /invalid_grant/i.test(msg) || (err && err.codigo === 'CONEXION_VENCIDA');
 }
+
 
 /** Lee las tres hojas de un laboratorio en una sola llamada a la API */
 async function leerLab(sheetId) {
-  const { sheets } = getApis();
+  const { sheets } = getApis(sheetId);
   if (!sheets) throw new Error("Google APIs no inicializadas");
 
   const claves = Object.keys(RANGOS);
@@ -124,6 +140,7 @@ async function leerLab(sheetId) {
   } catch (err) {
     // Si falta alguna hoja, batchGet falla entero. En ese caso se leen por
     // separado para que las demás sigan funcionando como antes.
+    if (/invalid_grant/i.test(err.message || '')) throw errConexionVencida();
     if (!/Unable to parse range/i.test(err.message || '')) throw err;
     const resultados = await Promise.allSettled(
       claves.map(k => sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: RANGOS[k] }))
@@ -227,7 +244,7 @@ async function prepararLab(sheetId, datos) {
 }
 
 async function ejecutarPreparacion(sheetId, datos) {
-  const { sheets } = getApis();
+  const { sheets } = getApis(sheetId);
 
   // Se vuelve a leer en el momento, por si otra preparación o una edición a
   // mano cambió algo desde la lectura que trajo `datos`.
@@ -383,7 +400,7 @@ async function getAppConfig(sheetId) {
     }
   } catch (e) {
     console.error(`[getAppConfig] Error al leer config de ${sheetId}:`, e.message);
-    if (e.message === "Google APIs no inicializadas") throw e;
+    if (e.message === "Google APIs no inicializadas" || e.codigo === 'CONEXION_VENCIDA') throw e;
     if (esErrorDeAcceso(e)) throw new Error("ACCESO_DENEGADO");
   }
   return config;
@@ -545,7 +562,7 @@ function getFormattedDate(fecha = new Date()) {
  * ordenado, insertado o borrado filas desde que se cargó la página.
  */
 async function ubicarArticulo(sheetId, id) {
-  const { sheets } = getApis();
+  const { sheets } = getApis(sheetId);
   if (!sheets) throw new Error("Google APIs no inicializadas");
   const idBuscado = (id == null ? '' : id).toString().trim();
   if (!ID_VALIDO.test(idBuscado)) {
@@ -579,7 +596,7 @@ async function ubicarArticulo(sheetId, id) {
 
 /** Escribe celdas de la fila de un artículo (valores por letra de columna) */
 async function escribirFila(sheetId, fila, celdas) {
-  const { sheets } = getApis();
+  const { sheets } = getApis(sheetId);
   try {
     await conReintentos(() => sheets.spreadsheets.values.batchUpdate({
       spreadsheetId: sheetId,
@@ -604,7 +621,7 @@ async function escribirFila(sheetId, fila, celdas) {
  * usuario se guarda como texto y nunca se interpreta como fórmula.
  */
 async function registrarEvento(sheetId, art, email, accion, detalle, fecha) {
-  const { sheets } = getApis();
+  const { sheets } = getApis(sheetId);
   await conReintentos(() => sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
     range: `${HOJA_HISTORIAL}!A:F`,
@@ -645,7 +662,7 @@ async function carpetaFotos(sheetId, drive) {
 
 /** Sube una foto a Drive y actualiza el Inventario */
 async function subirFoto(sheetId, email, id, base64Str, nombreArchivo) {
-  const { sheets } = getApis();
+  const { sheets } = getApis(sheetId);
   if (!sheets) throw new Error("Google APIs no inicializadas");
 
   // Las fotos las sube un admin con su propio permiso: la cuenta de servicio
@@ -707,7 +724,7 @@ async function subirFoto(sheetId, email, id, base64Str, nombreArchivo) {
 
 /** Registra un reporte de incidencia */
 async function registrarReporte(sheetId, email, id, texto) {
-  const { sheets } = getApis();
+  const { sheets } = getApis(sheetId);
   if (!sheets) throw new Error("Google APIs no inicializadas");
   const txt = (texto || '').toString().trim();
   if (!txt) throw new Error('El reporte está vacío.');
@@ -727,7 +744,7 @@ async function registrarReporte(sheetId, email, id, texto) {
 
 /** Cambia la zona de un artículo */
 async function cambiarUbicacion(sheetId, email, id, nuevaZona) {
-  const { sheets } = getApis();
+  const { sheets } = getApis(sheetId);
   if (!sheets) throw new Error("Google APIs no inicializadas");
   const zonaNuevaStr = (nuevaZona || '').toString().trim();
   if (!zonaNuevaStr) throw new Error('Falta la zona de destino.');
@@ -745,7 +762,7 @@ async function cambiarUbicacion(sheetId, email, id, nuevaZona) {
 
 /** Crea o edita una zona, si el nombre cambia, actualiza todos los artículos */
 async function guardarZona(sheetId, id, nombre, desc) {
-  const { sheets } = getApis();
+  const { sheets } = getApis(sheetId);
   if (!sheets) throw new Error("Google APIs no inicializadas");
 
   const idBuscado = (id || '').toString().trim();
@@ -821,7 +838,7 @@ async function guardarZona(sheetId, id, nombre, desc) {
 
 /** Eliminar una zona si no hay artículos */
 async function eliminarZona(sheetId, id, nombre) {
-  const { sheets } = getApis();
+  const { sheets } = getApis(sheetId);
   if (!sheets) throw new Error("Google APIs no inicializadas");
 
   const invRes = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: 'INVENTARIO!H3:H' });
@@ -872,7 +889,7 @@ async function eliminarZona(sheetId, id, nombre) {
 
 /** Generador de QRs: Escribe en la pestaña IMPRIMIR_QR usando IMAGE() */
 async function ejecutarGeneracionQR(sheetId, baseUrl, listaIds = []) {
-  const { sheets } = getApis();
+  const { sheets } = getApis(sheetId);
   if (!sheets) throw new Error("Google APIs no inicializadas");
 
   // 1. Obtener ubicaciones y filtrar
@@ -1054,5 +1071,5 @@ module.exports = {
   ejecutarGeneracionQR,
   invalidarLab,
   // para las pruebas
-  _internos: { calcularIdsFaltantes, getFormattedDate, esTransitorio, conReintentos },
+  _internos: { calcularIdsFaltantes, getFormattedDate, esTransitorio, conReintentos, getApis },
 };

@@ -32,14 +32,14 @@ Los laboratorios actuales **no cambian**: siguen en modo servicio hasta que algu
 
 ## Piezas
 
-### 1. Credenciales por laboratorio (`credenciales.js`)
+### 1. Credenciales por laboratorio (implementado)
 
 Reemplaza el `getApis()` global por `getApis(labId)`. Devuelve `{ sheets, drive }` ya autenticados para ese laboratorio:
 
 - si el laboratorio es de **usuario**, un cliente OAuth con el refresh token guardado de su dueño;
 - si no, el cliente de la cuenta de servicio, como hoy.
 
-Los clientes se guardan en memoria por laboratorio. El token vive en `drive-tokens/<labId>.json` (ya existe, modo 600); se le suma un campo `modo: "usuario"`. Un token sin ese campo (como el actual de fisicasauce2) sigue sirviendo solo para fotos.
+**Implementación:** `driveUsuario.js` guarda `modo: "usuario"` en el token y expone `esModoUsuario(labId)` y `clienteSheets(labId)`; `googleClient.getApis(labId)` elige entre ese cliente y el de la cuenta de servicio. Si Google responde `invalid_grant` (permiso revocado o vencido), se lanza un error `CONEXION_VENCIDA` y el servidor responde con una página 503 "Laboratorio desconectado". Los clientes se guardan en memoria por laboratorio. El token vive en `drive-tokens/<labId>.json` (ya existe, modo 600); se le suma un campo `modo: "usuario"`. Un token sin ese campo (como el actual de fisicasauce2) sigue sirviendo solo para fotos.
 
 Hay 11 llamadas a `getApis()` en `googleClient.js` y todas tienen el `sheetId` a mano, así que el cambio es mecánico. Ningún laboratorio puede recibir nunca las credenciales de otro: el único dato de entrada es el `labId` de la ruta, y hace falta una prueba automática que lo asegure.
 
@@ -91,7 +91,7 @@ Una ventaja de pasar a permisos de usuario: la cuota de la API de Sheets es por 
 | Fase | Contenido | Riesgo |
 |---|---|---|
 | 0 | ✅ Cruce Picker → token del servidor (hecho). Falta confirmar la duración del token | decidía si el diseño se sostiene |
-| 1 | `credenciales.js` y `getApis(labId)`, sin cambio visible; pruebas de aislamiento | bajo |
+| 1 | ✅ `getApis(labId)` y modo usuario (hecho; vive en `driveUsuario.js` y `googleClient.js`, no en un archivo aparte); pruebas de aislamiento en `tests/credencialesLab.test.js` | bajo |
 | 2 | `plantilla.js` y "Crear mi laboratorio" | medio |
 | 3 | Exportar planilla y ZIP de fotos | bajo |
 | 4 | Importar con Picker y mapeo | medio |

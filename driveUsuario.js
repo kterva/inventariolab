@@ -45,7 +45,7 @@ function urlAutorizacion(state, loginHint) {
 }
 
 /** Cambia el código de Google por el refresh token y lo guarda */
-async function guardarDesdeCodigo(labId, code, email) {
+async function guardarDesdeCodigo(labId, code, email, { modo } = {}) {
   const { tokens } = await clienteOAuth().getToken(code);
   if (!tokens.refresh_token) {
     throw new Error('Google no entregó el permiso permanente. Quitá el acceso de InventarioLab en https://myaccount.google.com/permissions y probá de nuevo.');
@@ -53,23 +53,43 @@ async function guardarDesdeCodigo(labId, code, email) {
   fs.mkdirSync(carpeta(), { recursive: true, mode: 0o700 });
   const destino = archivo(labId);
   const tmp = destino + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify({ refresh_token: tokens.refresh_token, email, autorizadoEn: new Date().toISOString() }), { mode: 0o600 });
+  fs.writeFileSync(tmp, JSON.stringify({ refresh_token: tokens.refresh_token, email, ...(modo && { modo }), autorizadoEn: new Date().toISOString() }), { mode: 0o600 });
   fs.renameSync(tmp, destino);
   _clientes.delete(labId);
 }
 
+// labId -> { auth, drive, sheets }; los clientes se arman una vez y se reutilizan
 const _clientes = new Map();
 
-/** Cliente de Drive que actúa como el admin que autorizó, o null si nadie autorizó */
-function clienteDrive(labId) {
+function clientes(labId) {
   if (_clientes.has(labId)) return _clientes.get(labId);
   const t = leer(labId);
   if (!t) return null;
   const auth = clienteOAuth();
   auth.setCredentials({ refresh_token: t.refresh_token });
-  const drive = google.drive({ version: 'v3', auth });
-  _clientes.set(labId, drive);
-  return drive;
+  const c = { auth, drive: google.drive({ version: 'v3', auth }), sheets: null };
+  _clientes.set(labId, c);
+  return c;
 }
 
-module.exports = { estado, urlAutorizacion, guardarDesdeCodigo, clienteDrive, ALCANCE, urlRetorno };
+/** Cliente de Drive que actúa como el admin que autorizó, o null si nadie autorizó */
+function clienteDrive(labId) {
+  const c = clientes(labId);
+  return c ? c.drive : null;
+}
+
+/** ¿La planilla de este laboratorio se maneja con el permiso de su dueño (y no con la cuenta de servicio)? */
+function esModoUsuario(labId) {
+  const t = leer(labId);
+  return !!t && t.modo === 'usuario';
+}
+
+/** Cliente de Sheets con el permiso del dueño, solo para laboratorios en modo usuario; si no, null */
+function clienteSheets(labId) {
+  if (!esModoUsuario(labId)) return null;
+  const c = clientes(labId);
+  if (!c.sheets) c.sheets = google.sheets({ version: 'v4', auth: c.auth });
+  return c.sheets;
+}
+
+module.exports = { estado, urlAutorizacion, guardarDesdeCodigo, clienteDrive, clienteSheets, esModoUsuario, ALCANCE, urlRetorno };

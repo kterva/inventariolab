@@ -122,6 +122,9 @@ router.use('/lab/:labId', async (req, res, next) => {
         serviceAccountEmail: SERVICE_ACCOUNT_EMAIL
       });
     }
+    if (err.codigo === 'CONEXION_VENCIDA') {
+      return res.status(503).send('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Laboratorio desconectado</title><body style="font-family:system-ui;max-width:32em;margin:3em auto;padding:0 1em"><h2>Laboratorio desconectado</h2><p>La conexión de este laboratorio con Google venció o fue revocada. Avisa a un administrador del laboratorio para que vuelva a conectarlo.</p></body>');
+    }
     console.error('Error al obtener config:', err);
     res.status(500).send('Error de servidor al contactar Google Sheets.');
   }

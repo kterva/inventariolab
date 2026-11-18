@@ -41,6 +41,7 @@ function libroInicial() {
 
 const st = global.__mock = {
   authCreados: 0, batchGet: 0, get: 0, escrituras: 0, llamadas: [],
+  revocados: new Set(), // refresh tokens que Google ya no acepta (invalid_grant)
   fallar: null,        // mensaje de error a lanzar en batchGet
   faltaHoja: null,     // rango que "no existe" en la planilla (en lecturas)
   fallarEscrituras: 0, // cuántas escrituras POST siguientes fallan con 503
@@ -126,10 +127,11 @@ const fake = {
           if (code === 'malo') throw new Error('invalid_grant');
           return { tokens: code === 'sin-refresh' ? { access_token: 'a' } : { access_token: 'a', refresh_token: 'rt-' + code } };
         }
-        setCredentials() {}
+        setCredentials(c) { this.credenciales = c; }
       },
     },
-    drive: () => ({
+    drive: ({ auth } = {}) => ({
+      __auth: auth,
       files: {
         get: async () => ({ data: { parents: ['carpeta-lab'] } }),
         list: async () => { st.llamadas.push('drive.list'); return { data: { files: [{ id: 'LAB_FOTOS' }] } }; },
@@ -137,7 +139,8 @@ const fake = {
       },
       permissions: { create: () => escritura('drive.permiso', () => ({})) },
     }),
-    sheets: () => ({
+    sheets: ({ auth } = {}) => ({
+      __auth: auth, // para que las pruebas vean con qué credenciales se creó el cliente
       spreadsheets: {
         get: async ({ spreadsheetId }) => {
           await espera();
@@ -169,6 +172,7 @@ const fake = {
           batchGet: async ({ spreadsheetId, ranges }) => {
             st.batchGet++; await espera();
             if (st.fallar) throw new Error(st.fallar);
+            if (auth && auth.credenciales && st.revocados.has(auth.credenciales.refresh_token)) throw err('invalid_grant', 400);
             return { data: { valueRanges: ranges.map(r => ({ range: r, values: leer(spreadsheetId, r) })) } };
           },
           get: async ({ spreadsheetId, range }) => {
