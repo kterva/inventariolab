@@ -32,10 +32,16 @@
       <div class="error">Este servidor todavía no tiene configurado el acceso con Google.</div>
     <% } else { %>
     <form method="post" action="/inventariolab/crear">
+      <input type="hidden" name="token" value="<%= token %>">
+      <div style="position:absolute;left:-9999px;" aria-hidden="true"><label>No completar este campo<input name="sitio_web" tabindex="-1" autocomplete="off"></label></div>
       <label for="institucion">Nombre del centro</label>
       <input id="institucion" name="institucion" maxlength="80" required placeholder="Ej: Liceo Sauce 2" autocomplete="organization">
       <label for="laboratorio">Nombre del laboratorio</label>
       <input id="laboratorio" name="laboratorio" maxlength="80" required placeholder="Ej: Laboratorio de Física">
+      <% if (turnstileClave) { %>
+      <div class="cf-turnstile" data-sitekey="<%= turnstileClave %>" style="margin-top:1rem"></div>
+      <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+      <% } %>
       <button type="submit">Continuar con Google</button>
     </form>
 
@@ -45,7 +51,7 @@
         <li>vea tu correo (para dejarte como administrador);</li>
         <li>cree y use <strong>solo los archivos que crea la app</strong>: tu planilla y la carpeta de fotos. No ve el resto de tu Drive.</li>
       </ul>
-      Podés quitar el permiso cuando quieras en <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.
+      Cuando creás un laboratorio, el administrador del servicio recibe un aviso con tu correo y los nombres que elegiste. Podés quitar el permiso cuando quieras en <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.
     </div>
     <% } %>
     <p style="margin-top:1.5rem;font-size:.85rem;"><a href="/inventariolab">← Volver</a> · <a href="/inventariolab/privacidad">Política de privacidad</a></p>

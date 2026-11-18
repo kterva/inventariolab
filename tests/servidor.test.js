@@ -230,12 +230,25 @@ test('autorizar Drive: solo admins, con estado anti-falsificación, y el permiso
   } finally { await s.parar(); }
 });
 
-test('crear mi laboratorio: pide Drive + correo, crea la planilla del docente y lo deja de admin', async () => {
+const ENV_CREAR = (tokens, correos, extra = {}) => ({ MODO_DEMO: 'NO', GOOGLE_CLIENT_ID: 'cliente-id', GOOGLE_CLIENT_SECRET: 'secreto', APP_BASE_URL: 'http://127.0.0.1',
+  DRIVE_TOKENS_DIR: tokens, CREAR_MIN_MS: '0', AVISO_CREACION_EMAIL: 'leo@aviso.test', SMTP_HOST: 'smtp.test', LOG_CORREOS: correos, ...extra });
+
+/** Abre el formulario (con su token firmado) y lo envía como lo haría el navegador */
+async function enviarFormulario(http, raiz, datos = { institucion: 'Liceo', laboratorio: 'Fisica' }, { sinToken = false } = {}) {
+  const pagina = await http(`${raiz}/crear`);
+  const token = (/name="token" value="([^"]+)"/.exec(pagina.texto) || [])[1] || '';
+  return http(`${raiz}/crear`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ ...(sinToken ? {} : { token }), ...datos }).toString() });
+}
+const leerCorreos = f => { try { return fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map(JSON.parse); } catch { return []; } };
+const esperarCorreos = async (f, n) => { for (let i = 0; i < 30 && leerCorreos(f).length < n; i++) await new Promise(r => setTimeout(r, 100)); return leerCorreos(f); };
+
+test('crear mi laboratorio: pide Drive + correo, crea la planilla del docente, lo deja de admin y avisa por correo', async () => {
   const tokens = fs.mkdtempSync(path.join(os.tmpdir(), 'invlab-tokens-'));
-  const s = await arrancar({ MODO_DEMO: 'NO', GOOGLE_CLIENT_ID: 'cliente-id', GOOGLE_CLIENT_SECRET: 'secreto', APP_BASE_URL: 'http://127.0.0.1', DRIVE_TOKENS_DIR: tokens });
+  const correos = path.join(tokens, '..', path.basename(tokens) + '-correos.log');
+  const s = await arrancar(ENV_CREAR(tokens, correos));
   try {
     const raiz = `http://127.0.0.1:${new URL(s.base).port}/inventariolab`;
-    const form = (http, datos) => http(`${raiz}/crear`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(datos).toString() });
 
     // la página existe y la portada la enlaza
     const http = cliente();
@@ -243,10 +256,10 @@ test('crear mi laboratorio: pide Drive + correo, crea la planilla del docente y 
     assert.ok((await http(raiz)).texto.includes('/inventariolab/crear'));
 
     // sin nombres no se llega a Google
-    assert.match((await form(http, { institucion: '  ', laboratorio: 'Física' })).location, /\/crear\?error=nombres$/);
+    assert.match((await enviarFormulario(http, raiz, { institucion: '  ', laboratorio: 'Física' })).location, /\/crear\?error=nombres$/);
 
     // con nombres: Google recibe Drive limitado + identidad, con un estado de un solo uso
-    const ini = await form(http, { institucion: 'Liceo Prueba', laboratorio: 'Laboratorio de Química' });
+    const ini = await enviarFormulario(http, raiz, { institucion: 'Liceo Prueba', laboratorio: 'Laboratorio de Química' });
     assert.equal(ini.status, 302);
     const u = new URL(ini.location);
     assert.deepEqual(u.searchParams.get('scope').split(' ').sort(), ['email', 'https://www.googleapis.com/auth/drive.file', 'openid']);
@@ -254,10 +267,11 @@ test('crear mi laboratorio: pide Drive + correo, crea la planilla del docente y 
     const state = u.searchParams.get('state');
     assert.ok(state && state.length >= 32);
 
-    // estado falso: rechazado y no se crea nada
+    // estado falso: rechazado y no se crea nada ni se avisa
     assert.equal((await http(`${raiz}/auth/drive/callback?state=falso&code=ana`)).status, 400);
     assert.equal(fs.readdirSync(tokens).length, 0);
     assert.equal(s.escrituras(), 0);
+    assert.equal(leerCorreos(correos).length, 0);
 
     // estado correcto: crea, guarda el permiso con modo usuario y entra al laboratorio nuevo
     const ok = await http(`${raiz}/auth/drive/callback?state=${state}&code=ana`);
@@ -267,6 +281,15 @@ test('crear mi laboratorio: pide Drive + correo, crea la planilla del docente y 
     const guardado = JSON.parse(fs.readFileSync(path.join(tokens, 'PLANILLA-NUEVA-1.json'), 'utf8'));
     assert.equal(guardado.modo, 'usuario'); assert.equal(guardado.email, 'ana@x.uy'); assert.equal(guardado.refresh_token, 'rt-ana');
 
+    // el administrador del servicio recibe un correo con quién fue
+    const [aviso] = await esperarCorreos(correos, 1);
+    assert.equal(aviso.to, 'leo@aviso.test');
+    assert.match(aviso.subject, /ana@x\.uy/);
+    assert.match(aviso.text, /Correo: +ana@x\.uy/);
+    assert.match(aviso.text, /Centro: +Liceo Prueba/);
+    assert.match(aviso.text, /Laboratorio: +Laboratorio de Química/);
+    assert.match(aviso.text, /\/inventariolab\/lab\/PLANILLA-NUEVA-1/);
+
     // la persona ya quedó con sesión y es admin del laboratorio nuevo
     const panel = await http(`${raiz}/lab/PLANILLA-NUEVA-1?creado=1`);
     assert.equal(panel.status, 200);
@@ -274,30 +297,98 @@ test('crear mi laboratorio: pide Drive + correo, crea la planilla del docente y 
     assert.ok(panel.texto.includes('Laboratorio de Química'));
     assert.ok(!panel.texto.includes('Autorizar Drive para guardar fotos'), 'ya tiene el permiso de Drive');
 
-    // el estado es de un solo uso
+    // el estado es de un solo uso y no hay un segundo aviso
     assert.equal((await http(`${raiz}/auth/drive/callback?state=${state}&code=ana`)).status, 400);
     assert.equal(fs.readdirSync(tokens).length, 1);
+    assert.equal(leerCorreos(correos).length, 1);
   } finally { await s.parar(); }
 });
 
-test('crear mi laboratorio: si se cancela el permiso no se crea nada', async () => {
+test('crear mi laboratorio: si se cancela el permiso no se crea nada ni se avisa', async () => {
   const tokens = fs.mkdtempSync(path.join(os.tmpdir(), 'invlab-tokens-'));
-  const s = await arrancar({ MODO_DEMO: 'NO', GOOGLE_CLIENT_ID: 'cliente-id', GOOGLE_CLIENT_SECRET: 'secreto', APP_BASE_URL: 'http://127.0.0.1', DRIVE_TOKENS_DIR: tokens });
+  const correos = path.join(tokens, 'correos.log');
+  const s = await arrancar(ENV_CREAR(tokens, correos));
   try {
     const raiz = `http://127.0.0.1:${new URL(s.base).port}/inventariolab`;
     const http = cliente();
-    const ini = await http(`${raiz}/crear`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'institucion=Liceo&laboratorio=Fisica' });
-    const state = new URL(ini.location).searchParams.get('state');
+    const state = new URL((await enviarFormulario(http, raiz)).location).searchParams.get('state');
     const cancelado = await http(`${raiz}/auth/drive/callback?state=${state}&error=access_denied`);
     assert.match(cancelado.location, /\/crear\?error=cancelado$/);
     assert.ok((await http(`${raiz}/crear?error=cancelado`)).texto.includes('Cancelaste el permiso'));
-    assert.equal(fs.readdirSync(tokens).length, 0);
-    assert.equal(s.escrituras(), 0);
 
     // una cuenta sin correo verificado tampoco crea nada
-    const ini2 = await http(`${raiz}/crear`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'institucion=Liceo&laboratorio=Fisica' });
-    const state2 = new URL(ini2.location).searchParams.get('state');
+    const state2 = new URL((await enviarFormulario(http, raiz)).location).searchParams.get('state');
     assert.match((await http(`${raiz}/auth/drive/callback?state=${state2}&code=sin-verificar`)).location, /\/crear\?error=fallo$/);
     assert.equal(fs.readdirSync(tokens).length, 0);
+    assert.equal(s.escrituras(), 0);
+    assert.equal(leerCorreos(correos).length, 0);
+  } finally { await s.parar(); }
+});
+
+test('crear mi laboratorio: un fallo del correo no impide crear el laboratorio', async () => {
+  const tokens = fs.mkdtempSync(path.join(os.tmpdir(), 'invlab-tokens-'));
+  const s = await arrancar(ENV_CREAR(tokens, path.join(tokens, 'correos.log'), { CORREO_FALLA: 'SI' }));
+  try {
+    const raiz = `http://127.0.0.1:${new URL(s.base).port}/inventariolab`;
+    const http = cliente();
+    const state = new URL((await enviarFormulario(http, raiz)).location).searchParams.get('state');
+    const ok = await http(`${raiz}/auth/drive/callback?state=${state}&code=eva`);
+    assert.match(ok.location, /\/lab\/PLANILLA-NUEVA-1\?creado=1$/);
+    assert.deepEqual(fs.readdirSync(tokens), ['PLANILLA-NUEVA-1.json']);
+  } finally { await s.parar(); }
+});
+
+test('crear mi laboratorio: frena a los bots (formulario falso, apurado, campo trampa, demasiados intentos)', async () => {
+  const tokens = fs.mkdtempSync(path.join(os.tmpdir(), 'invlab-tokens-'));
+  const s = await arrancar(ENV_CREAR(tokens, path.join(tokens, 'correos.log'), { CREAR_MIN_MS: '60000', CREAR_MAX_POR_IP_HORA: '2' }));
+  try {
+    const raiz = `http://127.0.0.1:${new URL(s.base).port}/inventariolab`;
+    const http = cliente();
+    const rechazo = r => assert.match(r.location, /\/crear\?error=formulario$/);
+    rechazo(await enviarFormulario(http, raiz, undefined, { sinToken: true }));          // sin token
+    rechazo(await enviarFormulario(http, raiz));                                          // enviado en menos de 60 s
+    const falso = await http(`${raiz}/crear`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'token=1700000000000.' + 'a'.repeat(64) + '&institucion=a&laboratorio=b' });
+    rechazo(falso);                                                                       // firma inventada
+    assert.equal(fs.readdirSync(tokens).filter(n => n.endsWith('.json')).length, 0);
+  } finally { await s.parar(); }
+
+  const s2 = await arrancar(ENV_CREAR(tokens, path.join(tokens, 'correos.log'), { CREAR_MAX_POR_IP_HORA: '2' }));
+  try {
+    const raiz = `http://127.0.0.1:${new URL(s2.base).port}/inventariolab`;
+    const http = cliente();
+    const pagina = await http(`${raiz}/crear`);
+    assert.match(pagina.texto, /name="sitio_web"/, 'el campo trampa está en el formulario');
+    const token = /name="token" value="([^"]+)"/.exec(pagina.texto)[1];
+    const post = cuerpo => http(`${raiz}/crear`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token, institucion: 'L', laboratorio: 'F', ...cuerpo }).toString() });
+    assert.match((await post({ sitio_web: 'http://spam' })).location, /error=formulario$/);   // campo trampa completado
+    assert.match((await post({})).location, /accounts\.example/);                              // 1.º intento válido de la IP
+    assert.match((await post({})).location, /accounts\.example/);                              // 2.º: pasa (el tope es 2 por hora)
+    assert.match((await post({})).location, /error=demasiados$/);                                // 3.º: frenado
+  } finally { await s2.parar(); }
+});
+
+test('crear mi laboratorio: topes por correo, por día y en total', async () => {
+  const tokens = fs.mkdtempSync(path.join(os.tmpdir(), 'invlab-tokens-'));
+  const s = await arrancar(ENV_CREAR(tokens, path.join(tokens, 'correos.log'), { CREAR_MAX_POR_CORREO: '1', CREAR_MAX_POR_DIA: '2', CREAR_MAX_TOTAL: '3', CREAR_MAX_POR_IP_HORA: '50' }));
+  try {
+    const raiz = `http://127.0.0.1:${new URL(s.base).port}/inventariolab`;
+    const http = cliente();
+    const crear = async codigo => {
+      const r = await enviarFormulario(http, raiz);
+      if (!/accounts\.example/.test(r.location || '')) return r.location;
+      return (await http(`${raiz}/auth/drive/callback?state=${new URL(r.location).searchParams.get('state')}&code=${codigo}`)).location;
+    };
+    assert.match(await crear('ana'), /\/lab\/PLANILLA-NUEVA-1\?creado=1$/);
+    assert.match(await crear('ana'), /\/crear\?error=limite-correo$/, 'la misma cuenta no crea otro');
+    // un formulario abierto antes de llegar al tope: al enviarlo, el servidor lo rechaza igual
+    const abierto = /name="token" value="([^"]+)"/.exec((await http(`${raiz}/crear`)).texto)[1];
+    assert.match(await crear('beto'), /\/lab\/PLANILLA-NUEVA-2\?creado=1$/);
+    const tarde = await http(`${raiz}/crear`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token: abierto, institucion: 'L', laboratorio: 'F' }).toString() });
+    assert.match(tarde.location, /\/crear\?error=limite-dia$/, 'tope diario (2)');
+    assert.deepEqual(fs.readdirSync(tokens).filter(n => n.endsWith('.json')).sort(), ['PLANILLA-NUEVA-1.json', 'PLANILLA-NUEVA-2.json']);
+    // con el tope diario alcanzado la página lo dice y no ofrece el formulario
+    const pagina = await http(`${raiz}/crear`);
+    assert.ok(pagina.texto.includes('Hoy se alcanzó el máximo'));
+    assert.ok(!pagina.texto.includes('Continuar con Google'));
   } finally { await s.parar(); }
 });

@@ -125,4 +125,18 @@ function clienteSheets(labId) {
   return c.sheets;
 }
 
-module.exports = { estado, urlAutorizacion, guardarDesdeCodigo, guardarToken, identificarYConectar, clienteDrive, clienteSheets, esModoUsuario, ALCANCE, urlRetorno };
+/** Laboratorios en modo usuario de este servidor: [{ labId, email, autorizadoEn }] */
+function laboratoriosPropios() {
+  let nombres = [];
+  try { nombres = fs.readdirSync(carpeta()).filter(n => n.endsWith('.json')); } catch { return []; }
+  const lista = [];
+  for (const n of nombres) {
+    try {
+      const t = JSON.parse(fs.readFileSync(path.join(carpeta(), n), 'utf8'));
+      if (t && t.modo === 'usuario') lista.push({ labId: n.slice(0, -5), email: String(t.email || '').toLowerCase(), autorizadoEn: t.autorizadoEn });
+    } catch { /* archivo ilegible: no cuenta */ }
+  }
+  return lista;
+}
+
+module.exports = { laboratoriosPropios, estado, urlAutorizacion, guardarDesdeCodigo, guardarToken, identificarYConectar, clienteDrive, clienteSheets, esModoUsuario, ALCANCE, urlRetorno };

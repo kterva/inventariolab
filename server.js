@@ -9,6 +9,8 @@ const FileSessionStore = require('./sessionStore');
 const crypto = require('crypto');
 const driveUsuario = require('./driveUsuario');
 const plantilla = require('./plantilla');
+const antibots = require('./antibots');
+const avisos = require('./avisos');
 const { crearBuscadorFoto, crearLimitador, ErrorBusquedaFoto } = require('./busquedaFoto');
 const { crearRegistro } = require('./registroBusquedas');
 
@@ -254,19 +256,43 @@ const MENSAJES_CREAR = {
   cancelado: 'Cancelaste el permiso en Google, así que no se creó nada. Podés intentarlo de nuevo.',
   fallo: 'No se pudo crear el laboratorio. Probá de nuevo en unos minutos; si se repite, avisá a quien administra el servidor.',
   nombres: 'Completá el nombre del centro y el del laboratorio.',
+  formulario: 'El formulario venció o se envió demasiado rápido. Recargá la página y probá de nuevo.',
+  verificacion: 'No pudimos comprobar que sos una persona. Probá de nuevo.',
+  demasiados: 'Hubo demasiados intentos desde tu conexión. Probá de nuevo más tarde.',
+  'limite-total': 'Este servidor no admite más laboratorios por ahora.',
+  'limite-dia': 'Hoy se alcanzó el máximo de laboratorios nuevos. Probá de nuevo mañana.',
+  'limite-correo': 'Esta cuenta de Google ya alcanzó el máximo de laboratorios que puede crear.',
 };
+const LIMITES_CREAR = antibots.topes();
+const limitarCreacionPorIp = crearLimitador(LIMITES_CREAR.porIpHora, 60 * 60 * 1000);
+const SECRETO_FORMULARIO = SESSION_SECRET || 'solo-desarrollo';
+const turnstile = { clave: process.env.TURNSTILE_SITE_KEY || '', secreto: process.env.TURNSTILE_SECRET_KEY || '' };
 
 router.get('/crear', (req, res) => {
-  res.render('crear', { error: MENSAJES_CREAR[req.query.error] || '', configurado: !!process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_ID !== 'test' });
+  const cerrado = antibots.motivoDeLimite(driveUsuario.laboratoriosPropios(), LIMITES_CREAR);
+  res.render('crear', {
+    error: MENSAJES_CREAR[req.query.error] || (cerrado === 'limite-total' || cerrado === 'limite-dia' ? MENSAJES_CREAR[cerrado] : ''),
+    configurado: !!process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_ID !== 'test' && !(cerrado === 'limite-total' || cerrado === 'limite-dia'),
+    token: antibots.emitirToken(SECRETO_FORMULARIO),
+    turnstileClave: turnstile.clave,
+  });
 });
 
-router.post('/crear', (req, res) => {
+router.post('/crear', async (req, res) => {
   if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID === 'test') {
     return res.status(500).send('Google OAuth no está configurado (falta el Client ID).');
   }
+  const volver = codigo => res.redirect(`/inventariolab/crear?error=${codigo}`);
+  // formulario genuino: token firmado y no demasiado rápido, y el campo trampa vacío
+  if (req.body.sitio_web || antibots.validarToken(req.body.token, SECRETO_FORMULARIO, { minMs: LIMITES_CREAR.minMs }) !== 'ok') return volver('formulario');
+  if (!limitarCreacionPorIp(req.ip)) return volver('demasiados');
+  if (turnstile.secreto && !(await antibots.verificarTurnstile({ secreto: turnstile.secreto, token: req.body['cf-turnstile-response'], ip: req.ip }))) return volver('verificacion');
+  const cerrado = antibots.motivoDeLimite(driveUsuario.laboratoriosPropios(), LIMITES_CREAR);
+  if (cerrado) return volver(cerrado);
+
   const institucion = plantilla.limpiarNombre(req.body.institucion);
   const laboratorio = plantilla.limpiarNombre(req.body.laboratorio);
-  if (!institucion || !laboratorio) return res.redirect('/inventariolab/crear?error=nombres');
+  if (!institucion || !laboratorio) return volver('nombres');
 
   const state = crypto.randomBytes(24).toString('hex');
   req.session.crearLab = { state, institucion, laboratorio };
@@ -281,12 +307,19 @@ async function finalizarCreacion(req, res, pedido) {
   if (req.query.error || !req.query.code) return res.redirect('/inventariolab/crear?error=cancelado');
   try {
     const cuenta = await driveUsuario.identificarYConectar(req.query.code);
+    // el tope por correo solo se puede comprobar ahora, que Google ya dijo quién es
+    const cerrado = antibots.motivoDeLimite(driveUsuario.laboratoriosPropios(), LIMITES_CREAR, { email: cuenta.email });
+    if (cerrado) {
+      console.warn(`[crear] rechazado (${cerrado}): ${cuenta.email}`);
+      return res.redirect(`/inventariolab/crear?error=${cerrado}`);
+    }
     const { sheetId } = await plantilla.crearLaboratorio({
       sheets: cuenta.sheets, drive: cuenta.drive,
       institucion: pedido.institucion, laboratorio: pedido.laboratorio, adminEmail: cuenta.email,
     });
     driveUsuario.guardarToken(sheetId, cuenta.refreshToken, cuenta.email, { modo: 'usuario' });
-    console.log(`[crear] laboratorio ${sheetId} creado`);
+    console.log(`[crear] laboratorio ${sheetId} creado por ${cuenta.email}`);
+    avisos.avisarCreacion({ email: cuenta.email, institucion: pedido.institucion, laboratorio: pedido.laboratorio, labId: sheetId, total: driveUsuario.laboratoriosPropios().length });
     // ya hizo login con Google: entra directo a su laboratorio
     req.session.email = cuenta.email;
     req.session.labId = sheetId;

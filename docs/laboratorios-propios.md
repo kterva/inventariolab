@@ -54,7 +54,14 @@ La estructura de la planilla (hojas, encabezados, fila de `config`) pasa a vivir
 3. En `/auth/drive/callback` (la misma URI de retorno ya registrada; el `state` distingue este flujo del de fotos) el servidor crea la planilla y la carpeta, deja a la persona como `ADMIN` en `config` y guarda el token con `modo: "usuario"` en `drive-tokens/<id de la planilla>.json`. El token se guarda **después** de crear, porque el id del laboratorio es el de la planilla.
 4. Abre la sesión de esa persona y redirige a `/inventariolab/lab/<id>?creado=1`.
 
-Si algo falla a mitad de camino (p. ej. después de crear la planilla), queda una planilla sin usar en el Drive del docente; la app no la borra. No hay todavía límite de laboratorios por servidor.
+Si algo falla a mitad de camino (p. ej. después de crear la planilla), queda una planilla sin usar en el Drive del docente; la app no la borra.
+
+**Aviso y protección contra bots** (`avisos.js`, `antibots.js`; variables en `.env.example`):
+
+- Cada laboratorio creado dispara un correo (nodemailer, SMTP propio) al administrador del servicio con el correo de la persona, los nombres, el id y el enlace. Si el envío falla o no está configurado, el laboratorio se crea igual y queda una línea en el log.
+- El formulario lleva un token firmado (fecha + HMAC con el secreto de sesión, sin guardar estado): un formulario inventado, vencido (más de 2 h) o enviado en menos de 3 s se rechaza. Hay un campo trampa invisible, un límite de 5 envíos por IP y hora, y topes de laboratorios por correo (3), por día (10) y en total (200). Los topes se cuentan desde los archivos de permiso ya guardados. El tope por correo solo puede comprobarse en el retorno de Google, que es cuando se conoce la cuenta.
+- Opcional: Cloudflare Turnstile (`TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`). Falla cerrado: si Cloudflare no responde, no se crea.
+- Lo principal contra bots sigue siendo que hace falta una cuenta de Google real con su consentimiento.
 
 ### 4. Exportar
 

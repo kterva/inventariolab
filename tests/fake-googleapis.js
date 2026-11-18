@@ -214,7 +214,19 @@ const fake = {
   },
 };
 
+// nodemailer simulado: anota cada correo en LOG_CORREOS (una línea JSON); CORREO_FALLA=SI hace que falle el envío
+const fakeCorreo = {
+  createTransport: () => ({
+    sendMail: async msg => {
+      if (process.env.CORREO_FALLA === 'SI') throw new Error('SMTP caído');
+      if (process.env.LOG_CORREOS) fs.appendFileSync(process.env.LOG_CORREOS, JSON.stringify(msg) + '\n');
+      return {};
+    },
+  }),
+};
+
 const cargarOriginal = Module._load;
 Module._load = function (pedido, ...resto) {
+  if (pedido === 'nodemailer') return fakeCorreo;
   return pedido === 'googleapis' ? fake : cargarOriginal.call(this, pedido, ...resto);
 };
