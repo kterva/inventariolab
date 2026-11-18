@@ -125,8 +125,11 @@ const fake = {
         generateAuthUrl(o) { return 'https://accounts.example/auth?' + new URLSearchParams({ state: o.state, scope: o.scope.join(' '), access_type: o.access_type, prompt: o.prompt, redirect_uri: this.retorno, login_hint: o.login_hint || '' }); }
         async getToken(code) {
           if (code === 'malo') throw new Error('invalid_grant');
-          return { tokens: code === 'sin-refresh' ? { access_token: 'a' } : { access_token: 'a', refresh_token: 'rt-' + code } };
+          // id_token simulado: el correo es <código>@x.uy (solo lo usa "Crear mi laboratorio")
+          const id_token = Buffer.from(JSON.stringify({ email: code + '@x.uy', email_verified: code !== 'sin-verificar' })).toString('base64');
+          return { tokens: code === 'sin-refresh' ? { access_token: 'a' } : { access_token: 'a', refresh_token: 'rt-' + code, id_token } };
         }
+        async verifyIdToken({ idToken }) { return { getPayload: () => JSON.parse(Buffer.from(idToken, 'base64').toString('utf8')) }; }
         setCredentials(c) { this.credenciales = c; }
       },
     },
@@ -142,6 +145,18 @@ const fake = {
     sheets: ({ auth } = {}) => ({
       __auth: auth, // para que las pruebas vean con qué credenciales se creó el cliente
       spreadsheets: {
+        create: ({ requestBody }) => escritura('spreadsheets.create', () => {
+          const id = 'PLANILLA-NUEVA-' + (st.creadas = (st.creadas || 0) + 1);
+          const libro = st.libros[id] = {};
+          const hojas = requestBody.sheets.map(h => {
+            const g = h.properties.gridProperties;
+            libro[h.properties.title] = { filas: [], columnas: g.columnCount, sheetId: proximoSheetId++, titulo: requestBody.properties.title };
+            return { properties: { title: h.properties.title, sheetId: libro[h.properties.title].sheetId } };
+          });
+          st.propietarios = st.propietarios || {};
+          st.propietarios[id] = auth && auth.credenciales && auth.credenciales.refresh_token;
+          return { spreadsheetId: id, sheets: hojas };
+        }),
         get: async ({ spreadsheetId }) => {
           await espera();
           const libro = st.libro(spreadsheetId);

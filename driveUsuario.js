@@ -34,28 +34,61 @@ function estado(labId) {
   return { autorizado: !!t, email: t ? t.email : null };
 }
 
-function urlAutorizacion(state, loginHint) {
+/** `conIdentidad`: además de Drive pide el correo de quien autoriza (para "Crear mi laboratorio", donde no hay sesión previa) */
+function urlAutorizacion(state, loginHint, { conIdentidad } = {}) {
   return clienteOAuth().generateAuthUrl({
     access_type: 'offline',   // para recibir un refresh token
     prompt: 'consent',        // Google solo lo entrega si se vuelve a pedir el consentimiento
-    scope: [ALCANCE],
+    scope: conIdentidad ? [ALCANCE, 'openid', 'email'] : [ALCANCE],
     state,
     ...(loginHint && { login_hint: loginHint }),
   });
 }
 
-/** Cambia el código de Google por el refresh token y lo guarda */
-async function guardarDesdeCodigo(labId, code, email, { modo } = {}) {
-  const { tokens } = await clienteOAuth().getToken(code);
+/** Cambia el código de Google por el refresh token (sin guardarlo) */
+async function canjearCodigo(code) {
+  const auth = clienteOAuth();
+  const { tokens } = await auth.getToken(code);
   if (!tokens.refresh_token) {
     throw new Error('Google no entregó el permiso permanente. Quitá el acceso de InventarioLab en https://myaccount.google.com/permissions y probá de nuevo.');
   }
+  auth.setCredentials(tokens);
+  return { tokens, auth };
+}
+
+/** Guarda el refresh token de un laboratorio (modo 600, escritura atómica) */
+function guardarToken(labId, refreshToken, email, { modo } = {}) {
   fs.mkdirSync(carpeta(), { recursive: true, mode: 0o700 });
   const destino = archivo(labId);
   const tmp = destino + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify({ refresh_token: tokens.refresh_token, email, ...(modo && { modo }), autorizadoEn: new Date().toISOString() }), { mode: 0o600 });
+  fs.writeFileSync(tmp, JSON.stringify({ refresh_token: refreshToken, email, ...(modo && { modo }), autorizadoEn: new Date().toISOString() }), { mode: 0o600 });
   fs.renameSync(tmp, destino);
   _clientes.delete(labId);
+}
+
+/** Cambia el código de Google por el refresh token y lo guarda */
+async function guardarDesdeCodigo(labId, code, email, { modo } = {}) {
+  const { tokens } = await canjearCodigo(code);
+  guardarToken(labId, tokens.refresh_token, email, { modo });
+}
+
+/**
+ * Para "Crear mi laboratorio": canjea el código y devuelve quién es (correo
+ * verificado por Google) y clientes de Sheets y Drive que actúan como esa
+ * persona. Todavía no se guarda nada: el laboratorio no tiene id hasta que se crea.
+ */
+async function identificarYConectar(code) {
+  const { tokens, auth } = await canjearCodigo(code);
+  if (!tokens.id_token) throw new Error('Google no entregó la identidad de la cuenta.');
+  const ticket = await auth.verifyIdToken({ idToken: tokens.id_token, audience: process.env.GOOGLE_CLIENT_ID });
+  const datos = ticket.getPayload();
+  if (!datos.email || datos.email_verified === false) throw new Error('La cuenta de Google no tiene un correo verificado.');
+  return {
+    email: datos.email.toLowerCase(),
+    refreshToken: tokens.refresh_token,
+    sheets: google.sheets({ version: 'v4', auth }),
+    drive: google.drive({ version: 'v3', auth }),
+  };
 }
 
 // labId -> { auth, drive, sheets }; los clientes se arman una vez y se reutilizan
@@ -92,4 +125,4 @@ function clienteSheets(labId) {
   return c.sheets;
 }
 
-module.exports = { estado, urlAutorizacion, guardarDesdeCodigo, clienteDrive, clienteSheets, esModoUsuario, ALCANCE, urlRetorno };
+module.exports = { estado, urlAutorizacion, guardarDesdeCodigo, guardarToken, identificarYConectar, clienteDrive, clienteSheets, esModoUsuario, ALCANCE, urlRetorno };

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crear mi laboratorio - InventarioLab</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #f2f4f7; color: #1a1a1a; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1.5rem; box-sizing: border-box; }
+    .card { background: #fff; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); max-width: 480px; width: 100%; border-top: 5px solid #27ae60; }
+    h1 { font-size: 1.4rem; color: #1a5276; margin: 0 0 .5rem; }
+    p, li { color: #4a5568; font-size: .95rem; line-height: 1.5; }
+    label { display: block; font-weight: bold; margin: 1rem 0 .4rem; color: #2c3e50; font-size: .9rem; }
+    input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
+    input:focus { outline: none; border-color: #27ae60; }
+    button { width: 100%; margin-top: 1.5rem; padding: 14px; background: #27ae60; color: #fff; border: none; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; }
+    button:hover { background: #219653; }
+    .error { background: #fdecea; border-left: 5px solid #e74c3c; padding: .8rem 1rem; border-radius: 6px; color: #922b21; margin: 1rem 0; font-size: .95rem; }
+    .nota { background: #e8f4f8; border: 1px solid #bce0ee; border-radius: 8px; padding: .8rem 1rem; margin-top: 1.2rem; font-size: .88rem; }
+    .nota ul { margin: .4rem 0 0; padding-left: 1.2rem; }
+    a { color: #1a5276; }
+  </style>
+  <link rel="icon" href="/inventariolab/public/app_icon">
+</head>
+<body>
+  <div class="card">
+    <h1>Crear mi laboratorio</h1>
+    <p>Se crea una planilla de Google Sheets y una carpeta de fotos en <strong>tu</strong> Google Drive. Los datos son tuyos y los podés abrir o llevarte cuando quieras.</p>
+
+    <% if (error) { %><div class="error"><%= error %></div><% } %>
+
+    <% if (!configurado) { %>
+      <div class="error">Este servidor todavía no tiene configurado el acceso con Google.</div>
+    <% } else { %>
+    <form method="post" action="/inventariolab/crear">
+      <label for="institucion">Nombre del centro</label>
+      <input id="institucion" name="institucion" maxlength="80" required placeholder="Ej: Liceo Sauce 2" autocomplete="organization">
+      <label for="laboratorio">Nombre del laboratorio</label>
+      <input id="laboratorio" name="laboratorio" maxlength="80" required placeholder="Ej: Laboratorio de Física">
+      <button type="submit">Continuar con Google</button>
+    </form>
+
+    <div class="nota">
+      Google te va a pedir permiso para que InventarioLab:
+      <ul>
+        <li>vea tu correo (para dejarte como administrador);</li>
+        <li>cree y use <strong>solo los archivos que crea la app</strong>: tu planilla y la carpeta de fotos. No ve el resto de tu Drive.</li>
+      </ul>
+      Podés quitar el permiso cuando quieras en <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.
+    </div>
+    <% } %>
+    <p style="margin-top:1.5rem;font-size:.85rem;"><a href="/inventariolab">← Volver</a> · <a href="/inventariolab/privacidad">Política de privacidad</a></p>
+  </div>
+</body>
+</html>

@@ -43,16 +43,18 @@ Reemplaza el `getApis()` global por `getApis(labId)`. Devuelve `{ sheets, drive 
 
 Hay 11 llamadas a `getApis()` en `googleClient.js` y todas tienen el `sheetId` a mano, así que el cambio es mecánico. Ningún laboratorio puede recibir nunca las credenciales de otro: el único dato de entrada es el `labId` de la ruta, y hace falta una prueba automática que lo asegure.
 
-### 2. Plantilla en código (`plantilla.js`)
+### 2. Plantilla en código (`plantilla.js`) (implementado)
 
-La estructura de la planilla (hojas, encabezados, fila de `config`) pasa a vivir en un solo lugar. La usan "Crear mi laboratorio" y la preparación que hoy hace `ejecutarPreparacion` (columna ID y hoja HISTORIAL). El prototipo ya tiene el cuerpo de `spreadsheets.create`.
+La estructura de la planilla (hojas, encabezados, fila de `config`) pasa a vivir en un solo lugar. La usan "Crear mi laboratorio" y la preparación que hoy hace `ejecutarPreparacion` (columna ID y hoja HISTORIAL). `plantilla.js` exporta los nombres de hojas, encabezados, el nombre de la carpeta de fotos y `crearLaboratorio()`; `googleClient.js` los importa. Todo se escribe como texto literal (`RAW`), así un nombre que empiece con `=` no se evalúa como fórmula. La planilla nace completa (HISTORIAL, columna ID protegida), así que la app no tiene que prepararla en la primera lectura.
 
-### 3. Crear mi laboratorio
+### 3. Crear mi laboratorio (implementado)
 
-1. La persona entra con Google (ya existe) y toca "Crear mi laboratorio" en una página nueva.
-2. Pide el permiso `drive.file` con un flujo de código (offline, con refresh token).
-3. El servidor crea la planilla desde la plantilla y la carpeta de fotos, deja a la persona como `ADMIN` en `config` y guarda el token con `modo: "usuario"`.
-4. Redirige a `/inventariolab/lab/<id>` con los QR listos para imprimir.
+1. En la portada, "Crear mi laboratorio" (`/inventariolab/crear`) pide el nombre del centro y del laboratorio.
+2. Redirige a Google con `drive.file` + `openid email` (flujo de código, offline). No hace falta haber iniciado sesión antes: el correo sale del `id_token`, verificado con `verifyIdToken`.
+3. En `/auth/drive/callback` (la misma URI de retorno ya registrada; el `state` distingue este flujo del de fotos) el servidor crea la planilla y la carpeta, deja a la persona como `ADMIN` en `config` y guarda el token con `modo: "usuario"` en `drive-tokens/<id de la planilla>.json`. El token se guarda **después** de crear, porque el id del laboratorio es el de la planilla.
+4. Abre la sesión de esa persona y redirige a `/inventariolab/lab/<id>?creado=1`.
+
+Si algo falla a mitad de camino (p. ej. después de crear la planilla), queda una planilla sin usar en el Drive del docente; la app no la borra. No hay todavía límite de laboratorios por servidor.
 
 ### 4. Exportar
 
@@ -92,7 +94,7 @@ Una ventaja de pasar a permisos de usuario: la cuota de la API de Sheets es por 
 |---|---|---|
 | 0 | ✅ Cruce Picker → token del servidor (hecho). Falta confirmar la duración del token | decidía si el diseño se sostiene |
 | 1 | ✅ `getApis(labId)` y modo usuario (hecho; vive en `driveUsuario.js` y `googleClient.js`, no en un archivo aparte); pruebas de aislamiento en `tests/credencialesLab.test.js` | bajo |
-| 2 | `plantilla.js` y "Crear mi laboratorio" | medio |
+| 2 | ✅ `plantilla.js` y "Crear mi laboratorio" (hecho; `tests/plantilla.test.js` y dos pruebas en `tests/servidor.test.js`) | medio |
 | 3 | Exportar planilla y ZIP de fotos | bajo |
 | 4 | Importar con Picker y mapeo | medio |
 | 5 | Relevo y reconexión, desconectar y borrar, cifrado de tokens, QR cortos | medio |

@@ -229,3 +229,75 @@ test('autorizar Drive: solo admins, con estado anti-falsificación, y el permiso
     assert.ok(panel.texto.includes('Drive autorizado'));
   } finally { await s.parar(); }
 });
+
+test('crear mi laboratorio: pide Drive + correo, crea la planilla del docente y lo deja de admin', async () => {
+  const tokens = fs.mkdtempSync(path.join(os.tmpdir(), 'invlab-tokens-'));
+  const s = await arrancar({ MODO_DEMO: 'NO', GOOGLE_CLIENT_ID: 'cliente-id', GOOGLE_CLIENT_SECRET: 'secreto', APP_BASE_URL: 'http://127.0.0.1', DRIVE_TOKENS_DIR: tokens });
+  try {
+    const raiz = `http://127.0.0.1:${new URL(s.base).port}/inventariolab`;
+    const form = (http, datos) => http(`${raiz}/crear`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(datos).toString() });
+
+    // la página existe y la portada la enlaza
+    const http = cliente();
+    assert.ok((await http(`${raiz}/crear`)).texto.includes('Continuar con Google'));
+    assert.ok((await http(raiz)).texto.includes('/inventariolab/crear'));
+
+    // sin nombres no se llega a Google
+    assert.match((await form(http, { institucion: '  ', laboratorio: 'Física' })).location, /\/crear\?error=nombres$/);
+
+    // con nombres: Google recibe Drive limitado + identidad, con un estado de un solo uso
+    const ini = await form(http, { institucion: 'Liceo Prueba', laboratorio: 'Laboratorio de Química' });
+    assert.equal(ini.status, 302);
+    const u = new URL(ini.location);
+    assert.deepEqual(u.searchParams.get('scope').split(' ').sort(), ['email', 'https://www.googleapis.com/auth/drive.file', 'openid']);
+    assert.equal(u.searchParams.get('access_type'), 'offline');
+    const state = u.searchParams.get('state');
+    assert.ok(state && state.length >= 32);
+
+    // estado falso: rechazado y no se crea nada
+    assert.equal((await http(`${raiz}/auth/drive/callback?state=falso&code=ana`)).status, 400);
+    assert.equal(fs.readdirSync(tokens).length, 0);
+    assert.equal(s.escrituras(), 0);
+
+    // estado correcto: crea, guarda el permiso con modo usuario y entra al laboratorio nuevo
+    const ok = await http(`${raiz}/auth/drive/callback?state=${state}&code=ana`);
+    assert.equal(ok.status, 302);
+    assert.match(ok.location, /\/lab\/PLANILLA-NUEVA-1\?creado=1$/);
+    assert.deepEqual(fs.readdirSync(tokens), ['PLANILLA-NUEVA-1.json']);
+    const guardado = JSON.parse(fs.readFileSync(path.join(tokens, 'PLANILLA-NUEVA-1.json'), 'utf8'));
+    assert.equal(guardado.modo, 'usuario'); assert.equal(guardado.email, 'ana@x.uy'); assert.equal(guardado.refresh_token, 'rt-ana');
+
+    // la persona ya quedó con sesión y es admin del laboratorio nuevo
+    const panel = await http(`${raiz}/lab/PLANILLA-NUEVA-1?creado=1`);
+    assert.equal(panel.status, 200);
+    assert.ok(panel.texto.includes('Tu laboratorio está creado'));
+    assert.ok(panel.texto.includes('Laboratorio de Química'));
+    assert.ok(!panel.texto.includes('Autorizar Drive para guardar fotos'), 'ya tiene el permiso de Drive');
+
+    // el estado es de un solo uso
+    assert.equal((await http(`${raiz}/auth/drive/callback?state=${state}&code=ana`)).status, 400);
+    assert.equal(fs.readdirSync(tokens).length, 1);
+  } finally { await s.parar(); }
+});
+
+test('crear mi laboratorio: si se cancela el permiso no se crea nada', async () => {
+  const tokens = fs.mkdtempSync(path.join(os.tmpdir(), 'invlab-tokens-'));
+  const s = await arrancar({ MODO_DEMO: 'NO', GOOGLE_CLIENT_ID: 'cliente-id', GOOGLE_CLIENT_SECRET: 'secreto', APP_BASE_URL: 'http://127.0.0.1', DRIVE_TOKENS_DIR: tokens });
+  try {
+    const raiz = `http://127.0.0.1:${new URL(s.base).port}/inventariolab`;
+    const http = cliente();
+    const ini = await http(`${raiz}/crear`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'institucion=Liceo&laboratorio=Fisica' });
+    const state = new URL(ini.location).searchParams.get('state');
+    const cancelado = await http(`${raiz}/auth/drive/callback?state=${state}&error=access_denied`);
+    assert.match(cancelado.location, /\/crear\?error=cancelado$/);
+    assert.ok((await http(`${raiz}/crear?error=cancelado`)).texto.includes('Cancelaste el permiso'));
+    assert.equal(fs.readdirSync(tokens).length, 0);
+    assert.equal(s.escrituras(), 0);
+
+    // una cuenta sin correo verificado tampoco crea nada
+    const ini2 = await http(`${raiz}/crear`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'institucion=Liceo&laboratorio=Fisica' });
+    const state2 = new URL(ini2.location).searchParams.get('state');
+    assert.match((await http(`${raiz}/auth/drive/callback?state=${state2}&code=sin-verificar`)).location, /\/crear\?error=fallo$/);
+    assert.equal(fs.readdirSync(tokens).length, 0);
+  } finally { await s.parar(); }
+});

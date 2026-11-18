@@ -8,6 +8,7 @@ const googleClient = require('./googleClient');
 const FileSessionStore = require('./sessionStore');
 const crypto = require('crypto');
 const driveUsuario = require('./driveUsuario');
+const plantilla = require('./plantilla');
 const { crearBuscadorFoto, crearLimitador, ErrorBusquedaFoto } = require('./busquedaFoto');
 const { crearRegistro } = require('./registroBusquedas');
 
@@ -229,7 +230,7 @@ router.get('/lab/:labId', async (req, res) => {
     email,
     labId,
     driveAutorizado: driveUsuario.estado(labId).autorizado,
-    driveMsg: String(req.query.drive || ''),
+    driveMsg: req.query.creado === '1' ? 'creado' : String(req.query.drive || ''),
     avisoMedicion: permisos.esAdmin && registroBusquedas.listoParaVerificar() ? { cantidad: registroBusquedas.cantidad() } : null
   });
 });
@@ -243,6 +244,61 @@ router.get('/', (req, res) => {
 router.get('/privacidad', (req, res) => {
   res.render('privacidad');
 });
+
+// ─── CREAR MI LABORATORIO ─────────────────────────────
+// La persona entra con Google y la app crea la planilla y la carpeta de fotos
+// en SU Drive (permiso drive.file); queda como ADMIN y el permiso se guarda
+// para que la app lea y escriba esa planilla. No hace falta compartir nada con
+// la cuenta de servicio.
+const MENSAJES_CREAR = {
+  cancelado: 'Cancelaste el permiso en Google, así que no se creó nada. Podés intentarlo de nuevo.',
+  fallo: 'No se pudo crear el laboratorio. Probá de nuevo en unos minutos; si se repite, avisá a quien administra el servidor.',
+  nombres: 'Completá el nombre del centro y el del laboratorio.',
+};
+
+router.get('/crear', (req, res) => {
+  res.render('crear', { error: MENSAJES_CREAR[req.query.error] || '', configurado: !!process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_ID !== 'test' });
+});
+
+router.post('/crear', (req, res) => {
+  if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID === 'test') {
+    return res.status(500).send('Google OAuth no está configurado (falta el Client ID).');
+  }
+  const institucion = plantilla.limpiarNombre(req.body.institucion);
+  const laboratorio = plantilla.limpiarNombre(req.body.laboratorio);
+  if (!institucion || !laboratorio) return res.redirect('/inventariolab/crear?error=nombres');
+
+  const state = crypto.randomBytes(24).toString('hex');
+  req.session.crearLab = { state, institucion, laboratorio };
+  req.session.save(err => {
+    if (err) return res.status(500).send('No se pudo iniciar la creación.');
+    res.redirect(driveUsuario.urlAutorizacion(state, undefined, { conIdentidad: true }));
+  });
+});
+
+async function finalizarCreacion(req, res, pedido) {
+  delete req.session.crearLab;
+  if (req.query.error || !req.query.code) return res.redirect('/inventariolab/crear?error=cancelado');
+  try {
+    const cuenta = await driveUsuario.identificarYConectar(req.query.code);
+    const { sheetId } = await plantilla.crearLaboratorio({
+      sheets: cuenta.sheets, drive: cuenta.drive,
+      institucion: pedido.institucion, laboratorio: pedido.laboratorio, adminEmail: cuenta.email,
+    });
+    driveUsuario.guardarToken(sheetId, cuenta.refreshToken, cuenta.email, { modo: 'usuario' });
+    console.log(`[crear] laboratorio ${sheetId} creado`);
+    // ya hizo login con Google: entra directo a su laboratorio
+    req.session.email = cuenta.email;
+    req.session.labId = sheetId;
+    req.session.save(err => {
+      if (err) console.error('[crear] sesión:', err.message);
+      res.redirect(`/inventariolab/lab/${encodeURIComponent(sheetId)}?creado=1`);
+    });
+  } catch (err) {
+    console.error('[crear]', err.message);
+    res.redirect('/inventariolab/crear?error=fallo');
+  }
+}
 
 // ─── AUTORIZAR DRIVE (para guardar fotos) ───────────
 // La cuenta de servicio no puede ser dueña de archivos en Drive (no tiene
@@ -267,6 +323,8 @@ router.get('/lab/:labId/auth/drive', async (req, res) => {
 });
 
 router.get('/auth/drive/callback', async (req, res) => {
+  const creando = req.session.crearLab;
+  if (creando && req.query.state && req.query.state === creando.state) return finalizarCreacion(req, res, creando);
   const pendiente = req.session.driveOAuth;
   const email = req.session.email;
   if (!pendiente || !email || !req.query.state || req.query.state !== pendiente.state) {

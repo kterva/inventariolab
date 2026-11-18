@@ -1,5 +1,6 @@
 const { google } = require('googleapis');
 const driveUsuario = require('./driveUsuario');
+const { NOMBRE_CARPETA_FOTOS, DESC_PROTECCION_ID, ENCABEZADOS_HISTORIAL } = require('./plantilla');
 
 // Inicializa el cliente de Google Auth con la Cuenta de Servicio
 function getAuthClient() {
@@ -82,7 +83,6 @@ const LETRA = i => String.fromCharCode(65 + i);
 const PRIMERA_FILA = 3; // la fila 1 es el título y la 2 los encabezados
 
 const HOJA_HISTORIAL = 'HISTORIAL';
-const ENCABEZADOS_HISTORIAL = ['Fecha', 'ID', 'Artículo', 'Usuario', 'Acción', 'Detalle'];
 
 // ─── REINTENTOS ───────────────────────────────────────
 // googleapis ya reintenta por su cuenta los GET y PUT (lecturas y
@@ -206,7 +206,6 @@ function calcularIdsFaltantes(inv) {
 // La columna ID se protege con "solo advertencia": quien puede editar la
 // planilla (los administradores) ve un aviso antes de tocar un ID, pero nada
 // se bloquea (ni la app, ni ordenar o insertar filas).
-const DESC_PROTECCION_ID = 'InventarioLab: IDs de artículos (no editar)';
 
 // Laboratorios cuya protección de la columna ID ya se verificó en este proceso
 const _protegidos = new Set();
@@ -636,8 +635,6 @@ const _carpetaFotos = new Map();
 
 /** Al cambiar la autorización de Drive, la carpeta guardada puede ser de otra cuenta */
 function olvidarCarpetaFotos(sheetId) { _carpetaFotos.delete(sheetId); }
-
-const NOMBRE_CARPETA_FOTOS = 'LAB_FOTOS (InventarioLab)';
 
 /** Busca (o crea) la carpeta de fotos en el Drive del admin que autorizó.
  *  Con el alcance `drive.file` la app solo ve lo que ella misma creó, así que
