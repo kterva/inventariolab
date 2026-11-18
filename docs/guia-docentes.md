@@ -118,7 +118,8 @@ Se agregan en la hoja **config** de la planilla, columnas A y B:
 ### 6. Llevarte tus datos
 
 - **La planilla:** ábrela en tu Drive. Descárgala como Excel con **Archivo → Descargar**.
-- **Todo junto:** en el panel, toca **Exportar todo** para bajar la planilla en Excel y un ZIP con las fotos.
+- **Desde el panel (solo administradores):** en la tarjeta **Exportar mis datos**, toca **Planilla (.xlsx)** para bajarla en Excel y **Fotos (.zip)** para bajar todas las fotos. El ZIP trae además un `indice.csv` que dice qué artículo es cada foto. Si hay muchas fotos puede tardar un poco; dejá la pestaña abierta.
+  > *Qué pasa:* la app te prepara una copia en tu computadora. No borra nada ni cambia tu planilla.
 
 ### 7. Si cambias de centro o dejas de usarlo
 

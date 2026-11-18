@@ -64,7 +64,7 @@
     <h3>Índice Rápido</h3>
     <ul>
       <li><a href="#que-es">1. ¿Qué es InventarioLab?</a></li>
-      <li><a href="#instalacion">2. Primeros Pasos (Instalación)</a></li>
+      <li><a href="#instalacion">2. Crear tu laboratorio (paso a paso)</a></li>
       <li><a href="#usuarios">3. Gestión de Profesores (Usuarios)</a></li>
       <li><a href="#excel">4. El Inventario (Google Sheets)</a></li>
       <li><a href="#zonas">5. Armarios y Códigos QR</a></li>
@@ -79,8 +79,48 @@
   </div>
 
   <div id="instalacion" class="section">
-    <h2>🚀 2. Primeros Pasos (Instalación)</h2>
-    <p>Para crear tu propio InventarioLab privado, no necesitas saber programar. Sigue estos pasos:</p>
+    <h2>🚀 2. Crear tu laboratorio (paso a paso)</h2>
+    <p>Para crear tu propio InventarioLab privado no necesitas saber programar ni instalar nada. Lo más simple es dejar que la aplicación cree todo por ti:</p>
+
+    <div class="step">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <b>Entra a la pantalla principal</b> y toca <b>"✨ Crear mi laboratorio"</b>.
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <b>Escribe el nombre de tu centro y del laboratorio</b> (por ejemplo, "Liceo Sauce 2" y "Laboratorio de Física") y toca <b>Continuar con Google</b>.
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-number">3</div>
+      <div class="step-content">
+        <b>Elige tu cuenta de Google y acepta los permisos.</b> Google te avisa que InventarioLab quiere ver tu correo (para dejarte como administrador) y crear y usar <b>solo los archivos que crea la propia aplicación</b>: tu planilla y la carpeta de fotos. <b>No puede ver el resto de tu Drive.</b> Puedes quitar el permiso cuando quieras en <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-number">4</div>
+      <div class="step-content">
+        <b>¡Listo!</b> La aplicación crea en <b>tu Google Drive</b> la planilla del inventario (con sus pestañas <code>INVENTARIO</code>, <code>HISTORIAL</code>, <code>ubicaciones</code> y <code>config</code>) y la carpeta de fotos, y entras al Panel de Control como administrador. La planilla es <b>tuya</b>: puedes abrirla desde tu Drive, compartirla o descargarla cuando quieras. No hace falta autorizar nada más para subir fotos.
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-number">5</div>
+      <div class="step-content">
+        <b>Sigue con la configuración:</b> crea tus armarios y códigos QR (sección 5), carga tus materiales en la pestaña <code>INVENTARIO</code> (sección 4) y agrega a tus colegas en la pestaña <code>config</code> (sección 3).
+      </div>
+    </div>
+
+    <div class="alert">
+      <b>Dos límites a tener en cuenta:</b> por seguridad, cada cuenta de Google puede crear un número limitado de laboratorios, y quien administra el servidor recibe un aviso con tu correo cuando creas uno.
+    </div>
+
+    <details style="margin-top:1.2rem;">
+      <summary style="cursor:pointer;font-weight:bold;color:var(--primary);">¿Ya tienes una planilla propia y prefieres usarla? (alternativa, 4 pasos)</summary>
+      <p style="margin-top:.8rem;">Es el método anterior: en vez de que la aplicación cree la planilla, copias la Planilla Modelo y se la compartes al servidor.</p>
+
     
     <div class="step">
       <div class="step-number">1</div>
@@ -110,6 +150,7 @@
     <div class="alert">
       <b>¡Listo!</b> Desde ahí puedes buscar materiales, crear armarios y subir fotos. Si no autorizas Drive, todo funciona menos guardar fotos nuevas.
     </div>
+    </details>
   </div>
 
   <div id="usuarios" class="section">

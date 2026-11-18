@@ -25,7 +25,9 @@
     .logout-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); padding: 5px 10px; border-radius: 4px; color: white; text-decoration: none; font-size: 0.85rem; margin-left: 10px; }
     .tooltip-icon { display: inline-block; width: 18px; height: 18px; background: #3498db; color: white; border-radius: 50%; text-align: center; font-size: 12px; line-height: 18px; cursor: help; margin-left: 5px; position: relative; vertical-align: middle; }
     .tooltip-icon:hover::after, .tooltip-icon:active::after { content: attr(data-tip); position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%); background: #2c3e50; color: white; padding: 5px 10px; border-radius: 4px; font-size: 12px; z-index: 10; font-weight: normal; width: max-content; max-width: 200px; white-space: normal; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-  </style>
+  .btn-export{display:inline-block;margin:4px 6px 4px 0;padding:8px 14px;background:#1a5276;color:#fff;border-radius:6px;text-decoration:none;font-weight:bold;font-size:.9rem}
+.btn-export:hover{background:#154360}
+</style>
   <meta name="theme-color" content="#1a5276">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -97,6 +99,15 @@
     <div class="card" onclick="loadZones()">
       <h3>📍 Impresión de QRs y Gestión de Zonas</h3>
       <p>1. Imprimir códigos QR según selección. 2. Agregar, eliminar o editar nombres y descripciones de los sectores. </p>
+    </div>
+    <div class="card" style="cursor:default;">
+      <h3>💾 Exportar mis datos</h3>
+      <p>Llevate tu laboratorio cuando quieras: la planilla completa y todas las fotos.</p>
+      <p style="margin-top:10px;">
+        <a class="btn-export" href="/inventariolab/lab/<%= encodeURIComponent(labId) %>/exportar/planilla.xlsx">📊 Planilla (.xlsx)</a>
+        <a class="btn-export" href="/inventariolab/lab/<%= encodeURIComponent(labId) %>/exportar/fotos.zip">🖼️ Fotos (.zip)</a>
+      </p>
+      <p style="font-size:.8rem;opacity:.75;">La planilla y las fotos ya están en tu Google Drive; esto te da una copia en tu computadora. El ZIP puede tardar si hay muchas fotos.</p>
     </div>
     <% } %>
   </div>

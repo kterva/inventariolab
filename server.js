@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const driveUsuario = require('./driveUsuario');
 const plantilla = require('./plantilla');
 const antibots = require('./antibots');
+const exportar = require('./exportar');
 const avisos = require('./avisos');
 const { crearBuscadorFoto, crearLimitador, ErrorBusquedaFoto } = require('./busquedaFoto');
 const { crearRegistro } = require('./registroBusquedas');
@@ -456,6 +457,60 @@ const requireReportar = (req, res, next) => {
   if (!req.userPermisos.puedeReportar) return res.status(403).json({ error: 'Tu rol es de solo lectura' });
   next();
 };
+
+// ─── EXPORTAR (solo admins) ───────────────────────────
+// El laboratorio es del docente: puede llevarse la planilla (.xlsx) y las fotos
+// (ZIP) cuando quiera. Se limita a un ZIP por laboratorio a la vez y a 2 en todo
+// el servidor, porque bajar cientos de fotos ocupa red y memoria del VPS.
+const exportandoFotos = new Set();
+const MAX_EXPORTACIONES_SIMULTANEAS = 2;
+
+/** Content-Disposition con un nombre legible (con tildes) y uno ASCII de respaldo */
+function adjunto(nombre, extension) {
+  const base = exportar.nombreSeguro(nombre, 80);
+  const ascii = base.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9 ._()-]/g, '_');
+  return `attachment; filename="${ascii}.${extension}"; filename*=UTF-8''${encodeURIComponent(base + '.' + extension)}`;
+}
+
+router.get('/lab/:labId/exportar/planilla.xlsx', apiAuth, requireAdmin, async (req, res) => {
+  try {
+    const stream = await googleClient.abrirExportacionXlsx(req.params.labId);
+    res.setHeader('Content-Type', exportar.MIME_XLSX);
+    res.setHeader('Content-Disposition', adjunto(`${req.appConfig.laboratorio} - ${req.appConfig.institucion}`, 'xlsx'));
+    res.setHeader('Cache-Control', 'no-store');
+    stream.on('error', err => { console.error('[exportar xlsx]', err.message); res.destroy(err); });
+    res.on('close', () => stream.destroy());
+    stream.pipe(res);
+  } catch (err) {
+    console.error('[exportar xlsx]', err.message);
+    const status = err.codigo === 'CONEXION_VENCIDA' ? 503 : err.codigo === 'PLANILLA_GRANDE' ? 413 : 502;
+    res.status(status).json({ error: err.codigo ? err.message : 'No se pudo exportar la planilla. Probá de nuevo en unos minutos.' });
+  }
+});
+
+router.get('/lab/:labId/exportar/fotos.zip', apiAuth, requireAdmin, async (req, res) => {
+  const { labId } = req.params;
+  if (exportandoFotos.has(labId)) return res.status(429).json({ error: 'Ya hay una exportación de fotos en curso para este laboratorio. Esperá a que termine.' });
+  if (exportandoFotos.size >= MAX_EXPORTACIONES_SIMULTANEAS) return res.status(429).json({ error: 'El servidor está exportando fotos de otros laboratorios. Probá de nuevo en unos minutos.' });
+  exportandoFotos.add(labId);
+  const cancelador = new AbortController();
+  res.on('close', () => { if (!res.writableFinished) cancelador.abort(); exportandoFotos.delete(labId); });
+  try {
+    const articulos = await googleClient.articulosConFoto(labId);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', adjunto(`Fotos - ${req.appConfig.laboratorio} - ${req.appConfig.institucion}`, 'zip'));
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Accel-Buffering', 'no'); // que Nginx no junte todo antes de enviar
+    const r = await exportar.armarZip({ articulos, salida: res, señal: cancelador.signal });
+    console.log(`[exportar fotos] ${labId}: ${r.fotos} fotos, ${r.fallidas} fallidas, ${r.bytes} bytes`);
+  } catch (err) {
+    console.error('[exportar fotos]', err.message);
+    if (!res.headersSent) {
+      res.status(err.codigo === 'DEMASIADAS_FOTOS' ? 413 : err.codigo === 'CONEXION_VENCIDA' ? 503 : 500)
+        .json({ error: err.codigo ? err.message : 'No se pudo armar el ZIP de fotos.' });
+    } else res.destroy(err); // el ZIP ya empezó: se corta para que el navegador no lo dé por completo
+  }
+});
 
 router.get('/lab/:labId/api/buscar', apiAuth, async (req, res) => {
   try {

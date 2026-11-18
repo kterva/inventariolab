@@ -63,11 +63,15 @@ Si algo falla a mitad de camino (p. ej. después de crear la planilla), queda un
 - Opcional: Cloudflare Turnstile (`TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`). Falla cerrado: si Cloudflare no responde, no se crea.
 - Lo principal contra bots sigue siendo que hace falta una cuenta de Google real con su consentimiento.
 
-### 4. Exportar
+### 4. Exportar (implementado)
 
-- **Planilla:** `drive.files.export` a `.xlsx`, ya que la planilla es del docente y el permiso la cubre.
-- **Fotos:** un ZIP generado en streaming, solo para admins. La planilla sola no alcanza porque las fotos son enlaces de Drive.
-- Siempre disponible, también para laboratorios de servicio con fotos propias.
+Solo para admins, desde la tarjeta "Exportar mis datos" del panel. Disponible en todos los laboratorios, también los de cuenta de servicio.
+
+- **Planilla:** `GET /lab/<id>/exportar/planilla.xlsx` pide a Google (`drive.files.export`) el .xlsx y lo pasa en streaming. Funciona con el permiso del dueño o con la cuenta de servicio. Google limita el tamaño exportado (10 MB): si se supera, la app responde 413 con la alternativa (Archivo → Descargar en Sheets).
+- **Fotos:** `GET /lab/<id>/exportar/fotos.zip` arma el ZIP (`exportar.js`, librería `archiver` 7, sin compresión porque las fotos ya vienen comprimidas) bajando cada foto por su enlace público `lh3.googleusercontent.com/d/<id>`, el mismo que muestra la app. Así no depende de qué cuenta subió cada foto. Contiene `fotos/<ID>_<artículo>.<ext>`, `indice.csv` (qué es cada archivo y si alguna no se pudo bajar) y `LEEME.txt`.
+- **Cuidado del servidor:** una foto que falla no frena el resto (queda anotada en el índice); se espera a que el destino reciba lo enviado antes de bajar más (no se acumulan fotos en memoria); si el navegador se desconecta se deja de bajar; un solo ZIP por laboratorio a la vez y 2 en todo el servidor; hasta 5000 fotos y 25 MB por foto.
+- **Seguridad:** nombres de archivo sin separadores ni caracteres reservados (no se puede escribir fuera de la carpeta), extensión según los bytes de la imagen, solo se bajan enlaces `https://lh3.googleusercontent.com/d/<id>`, y el CSV neutraliza valores que parezcan fórmulas.
+- **Pendiente:** las fotos de la versión vieja (Apps Script) que no sean enlaces `lh3…/d/<id>` no se incluyen y quedan marcadas en el índice.
 
 ### 5. Importar una planilla existente
 
@@ -102,7 +106,7 @@ Una ventaja de pasar a permisos de usuario: la cuota de la API de Sheets es por 
 | 0 | ✅ Cruce Picker → token del servidor (hecho). Falta confirmar la duración del token | decidía si el diseño se sostiene |
 | 1 | ✅ `getApis(labId)` y modo usuario (hecho; vive en `driveUsuario.js` y `googleClient.js`, no en un archivo aparte); pruebas de aislamiento en `tests/credencialesLab.test.js` | bajo |
 | 2 | ✅ `plantilla.js` y "Crear mi laboratorio" (hecho; `tests/plantilla.test.js` y dos pruebas en `tests/servidor.test.js`) | medio |
-| 3 | Exportar planilla y ZIP de fotos | bajo |
+| 3 | ✅ Exportar planilla y ZIP de fotos (hecho; `exportar.js`, `tests/exportar.test.js`) | bajo |
 | 4 | Importar con Picker y mapeo | medio |
 | 5 | Relevo y reconexión, desconectar y borrar, cifrado de tokens, QR cortos | medio |
 

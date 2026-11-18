@@ -137,6 +137,13 @@ const fake = {
       __auth: auth,
       files: {
         get: async () => ({ data: { parents: ['carpeta-lab'] } }),
+        // exportación simulada: un "xlsx" de mentira con el id de la planilla; EXPORT_FALLA='grande' simula el límite de 10 MB
+        export: async ({ fileId, mimeType }) => {
+          st.llamadas.push('drive.export'); await espera();
+          if (st.exportFalla === 'grande') throw err('This file is too large to be exported.', 403);
+          const { Readable } = require('stream');
+          return { data: Readable.from([Buffer.from(`XLSX:${fileId}:${mimeType}`)]) };
+        },
         list: async () => { st.llamadas.push('drive.list'); return { data: { files: [{ id: 'LAB_FOTOS' }] } }; },
         create: ({ requestBody }) => escritura('drive.create', () => ({ id: 'archivo-' + requestBody.name })),
       },

@@ -38,7 +38,7 @@ test('crea las 4 hojas, la columna ID protegida, la carpeta de fotos y deja al d
 
   const libro = m.libros[r.sheetId];
   assert.deepEqual(Object.keys(libro).sort(), ['HISTORIAL', 'INVENTARIO', 'config', 'ubicaciones']);
-  assert.match(libro.INVENTARIO.titulo, /Biología.*Liceo Norte/);
+  assert.equal(libro.INVENTARIO.titulo, 'Inventario Laboratorio - Liceo Norte');
   assert.deepEqual(m.valores(r.sheetId, 'INVENTARIO')[1], pl.ENCABEZADOS_INVENTARIO);
   assert.deepEqual(m.valores(r.sheetId, 'HISTORIAL')[0], pl.ENCABEZADOS_HISTORIAL);
   assert.deepEqual(m.valores(r.sheetId, 'config')[1].slice(0, 2), ['lucia@x.uy', 'ADMIN']);

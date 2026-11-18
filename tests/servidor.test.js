@@ -392,3 +392,52 @@ test('crear mi laboratorio: topes por correo, por día y en total', async () => 
     assert.ok(!pagina.texto.includes('Continuar con Google'));
   } finally { await s.parar(); }
 });
+
+test('exportar: solo admins; la planilla sale como .xlsx y el ZIP de fotos es un ZIP válido', async () => {
+  const fotos = async (s, cookie, ruta) => {
+    const r = await fetch(`${s.base}/exportar/${ruta}`, { redirect: 'manual', headers: { cookie } });
+    return { status: r.status, tipo: r.headers.get('content-type'), disp: r.headers.get('content-disposition'), cuerpo: Buffer.from(await r.arrayBuffer()) };
+  };
+
+  // sin sesión: no hay exportación
+  let s = await arrancar({ MODO_DEMO: 'NO' });
+  try {
+    for (const ruta of ['planilla.xlsx', 'fotos.zip']) assert.equal((await fetch(`${s.base}/exportar/${ruta}`)).status, 401);
+  } finally { await s.parar(); }
+
+  // un docente (LECTOR) o un visor no exportan ni ven la tarjeta
+  for (const rol of ['LECTOR', 'VISOR']) {
+    s = await arrancar({ MODO_DEMO: 'SI', DEMO_ROL: rol });
+    try {
+      const http = cliente();
+      const panel = await http(s.base);
+      assert.ok(!panel.texto.includes('Exportar mis datos'));
+      assert.equal((await fotos(s, panel.cookie(), 'planilla.xlsx')).status, 403);
+      assert.equal((await fotos(s, panel.cookie(), 'fotos.zip')).status, 403);
+    } finally { await s.parar(); }
+  }
+
+  // un admin ve la tarjeta y se lleva los dos archivos
+  s = await arrancar({ MODO_DEMO: 'SI', DEMO_ROL: 'ADMIN' });
+  try {
+    const http = cliente();
+    const abierto = await http(s.base);
+    const panel = abierto.texto, cookie = abierto.cookie();
+    assert.ok(panel.includes('Exportar mis datos'));
+    assert.ok(panel.includes('/exportar/planilla.xlsx') && panel.includes('/exportar/fotos.zip'));
+
+    const xlsx = await fotos(s, cookie, 'planilla.xlsx');
+    assert.equal(xlsx.status, 200);
+    assert.equal(xlsx.tipo, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    assert.match(xlsx.disp, /^attachment; filename="[^"]*\.xlsx"; filename\*=UTF-8''/);
+    assert.ok(!/[\r\n]/.test(xlsx.disp));
+    assert.ok(xlsx.cuerpo.toString().startsWith('XLSX:LABTEST:'), 'es la exportación de ESTA planilla');
+
+    const zip = await fotos(s, cookie, 'fotos.zip');
+    assert.equal(zip.status, 200);
+    assert.equal(zip.tipo, 'application/zip');
+    assert.match(zip.disp, /\.zip"/);
+    assert.equal(zip.cuerpo.readUInt32LE(0), 0x04034b50, 'empieza como un ZIP');
+    assert.ok(zip.cuerpo.includes(Buffer.from('indice.csv')) && zip.cuerpo.includes(Buffer.from('LEEME.txt')));
+  } finally { await s.parar(); }
+});

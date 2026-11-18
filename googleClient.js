@@ -1,5 +1,6 @@
 const { google } = require('googleapis');
 const driveUsuario = require('./driveUsuario');
+const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const { NOMBRE_CARPETA_FOTOS, DESC_PROTECCION_ID, ENCABEZADOS_HISTORIAL } = require('./plantilla');
 
 // Inicializa el cliente de Google Auth con la Cuenta de Servicio
@@ -533,6 +534,26 @@ async function articulosConFoto(sheetId) {
     .filter(a => a.id && a.foto);
 }
 
+/**
+ * Abre la descarga de la planilla como .xlsx (la genera Google) y devuelve el
+ * stream. Con el permiso del dueño en modo usuario, con la cuenta de servicio si no.
+ * Google limita el tamaño exportado (10 MB): se avisa con un mensaje claro.
+ */
+async function abrirExportacionXlsx(sheetId) {
+  const { drive } = getApis(sheetId);
+  if (!drive) throw new Error('Google APIs no inicializadas');
+  try {
+    const res = await conReintentos(() => drive.files.export({ fileId: sheetId, mimeType: MIME_XLSX }, { responseType: 'stream' }), 'exportar planilla');
+    return res.data;
+  } catch (err) {
+    if (/too large|exportSizeLimitExceeded/i.test(`${err.message} ${JSON.stringify(err.errors || '')}`)) {
+      throw Object.assign(new Error('La planilla es demasiado grande para que Google la exporte. Abrila en Google Sheets y usá Archivo → Descargar → Microsoft Excel.'), { codigo: 'PLANILLA_GRANDE' });
+    }
+    if (/invalid_grant/i.test(err.message || '')) throw errConexionVencida();
+    throw err;
+  }
+}
+
 /** Devuelve la lista de zonas desde la hoja ubicaciones */
 async function obtenerZonasAdmin(sheetId) {
   try {
@@ -1058,6 +1079,7 @@ module.exports = {
   getFilasPorZona,
   buscarEnInventario,
   articulosConFoto,
+  abrirExportacionXlsx,
   olvidarCarpetaFotos,
   obtenerZonasAdmin,
   subirFoto: conInvalidacion(subirFoto),

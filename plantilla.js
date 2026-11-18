@@ -27,7 +27,7 @@ function cuerpoPlanilla({ institucion, laboratorio }) {
     properties: { title, gridProperties: { rowCount: 1000, columnCount, frozenRowCount } },
   });
   return {
-    properties: { title: `InventarioLab - ${laboratorio} (${institucion})` },
+    properties: { title: `Inventario Laboratorio - ${institucion}` },
     sheets: [
       hoja('INVENTARIO', ENCABEZADOS_INVENTARIO.length, 2),
       hoja('HISTORIAL', ENCABEZADOS_HISTORIAL.length, 1),
