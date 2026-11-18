@@ -345,6 +345,11 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error de servidor');
       btn.textContent = '✅ Foto guardada';
+      // se muestra la foto guardada junto al botón, para que se vea que se subió
+      const mini = document.createElement('img');
+      mini.src = fotoPendiente; mini.alt = '';
+      mini.style.cssText = 'display:block; width:72px; height:72px; object-fit:cover; border-radius:6px; margin-top:6px;';
+      btn.insertAdjacentElement('afterend', mini);
       fotoPendiente = null;
     } catch (err) {
       btn.disabled = false; btn.textContent = '❌ ' + err.message;

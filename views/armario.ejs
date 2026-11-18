@@ -379,24 +379,29 @@ function procesarArchivo(input) {
         canvas.width = img.width * scale; canvas.height = img.height * scale;
         canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
         
+        var fotoLocal = canvas.toDataURL("image/jpeg", 0.7);
         try {
           const res = await fetch(`/inventariolab/lab/${LAB_ID}/api/foto`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: item.dataset.id, base64: canvas.toDataURL("image/jpeg", 0.7), nombreArchivo: file.name })
+            body: JSON.stringify({ id: item.dataset.id, base64: fotoLocal, nombreArchivo: file.name })
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Error de servidor');
           
           btnFoto.innerText = "✅ Subida"; btnFoto.disabled = false;
           mostrarUltimo(item, data.ultimo);
+          // La miniatura se muestra con la misma foto que se acaba de subir (ya está en el
+          // navegador), así aparece al instante; la URL de Drive puede tardar unos segundos.
           var thumb = item.querySelector(".thumb");
-          if (thumb) { thumb.src = data.url; thumb.dataset.src = data.url; }
-          else {
-            var newImg = document.createElement("img"); newImg.className = "thumb";
-            newImg.src = data.url; newImg.dataset.src = data.url;
-            item.insertBefore(newImg, item.querySelector(".upload-wrap"));
+          if (!thumb) {
+            thumb = document.createElement("img"); thumb.className = "thumb";
+            item.insertBefore(thumb, item.querySelector(".upload-wrap"));
           }
+          thumb.src = fotoLocal; thumb.dataset.src = fotoLocal;
+          // si se cambia de página y se vuelve, se usa la foto ya guardada
+          var dato = DATA.find(function(d) { return String(d.id) === String(item.dataset.id); });
+          if (dato) dato.foto = data.url;
         } catch (err) {
           btnFoto.innerText = "❌ Error"; btnFoto.disabled = false;
           item.querySelector(".msg-foto").innerText = "Error: " + err.message;
