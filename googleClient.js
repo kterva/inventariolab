@@ -1,4 +1,5 @@
 const { google } = require('googleapis');
+const driveUsuario = require('./driveUsuario');
 
 // Inicializa el cliente de Google Auth con la Cuenta de Servicio
 function getAuthClient() {
@@ -616,32 +617,26 @@ async function registrarEvento(sheetId, art, email, accion, detalle, fecha) {
 // sheetId -> id de la carpeta LAB_FOTOS (no cambia; se vuelve a buscar si falla)
 const _carpetaFotos = new Map();
 
-/** Busca (o crea) la carpeta LAB_FOTOS junto a la planilla */
-async function carpetaFotos(sheetId) {
+/** Al cambiar la autorización de Drive, la carpeta guardada puede ser de otra cuenta */
+function olvidarCarpetaFotos(sheetId) { _carpetaFotos.delete(sheetId); }
+
+const NOMBRE_CARPETA_FOTOS = 'LAB_FOTOS (InventarioLab)';
+
+/** Busca (o crea) la carpeta de fotos en el Drive del admin que autorizó.
+ *  Con el alcance `drive.file` la app solo ve lo que ella misma creó, así que
+ *  esta carpeta es siempre la suya (no la LAB_FOTOS de la versión de Apps Script). */
+async function carpetaFotos(sheetId, drive) {
   if (_carpetaFotos.has(sheetId)) return _carpetaFotos.get(sheetId);
-  const { drive } = getApis();
-
-  // 1. Averiguar en qué carpeta está guardada la planilla
-  let parentId = null;
-  try {
-    const sheetFile = await drive.files.get({ fileId: sheetId, fields: 'parents' });
-    if (sheetFile.data.parents && sheetFile.data.parents.length > 0) parentId = sheetFile.data.parents[0];
-  } catch (err) {
-    console.log('No se pudo obtener el parentId de la planilla (puede estar en el root o falta permiso sobre la carpeta).', err.message);
-  }
-
-  // 2. Buscar o crear la carpeta LAB_FOTOS dentro de esa misma carpeta
-  let q = "name = 'LAB_FOTOS' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
-  if (parentId) q += ` and '${parentId}' in parents`;
+  const q = `name = '${NOMBRE_CARPETA_FOTOS}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
   const folderQuery = await drive.files.list({ q, fields: 'files(id)', spaces: 'drive' });
 
   let folderId;
   if (folderQuery.data.files && folderQuery.data.files.length > 0) {
     folderId = folderQuery.data.files[0].id;
   } else {
-    const requestBody = { name: 'LAB_FOTOS', mimeType: 'application/vnd.google-apps.folder' };
-    if (parentId) requestBody.parents = [parentId];
-    const folderRes = await conReintentos(() => drive.files.create({ requestBody, fields: 'id' }), 'crear LAB_FOTOS');
+    const folderRes = await conReintentos(
+      () => drive.files.create({ requestBody: { name: NOMBRE_CARPETA_FOTOS, mimeType: 'application/vnd.google-apps.folder' }, fields: 'id' }),
+      'crear carpeta de fotos');
     folderId = folderRes.data.id;
   }
   _carpetaFotos.set(sheetId, folderId);
@@ -650,8 +645,13 @@ async function carpetaFotos(sheetId) {
 
 /** Sube una foto a Drive y actualiza el Inventario */
 async function subirFoto(sheetId, email, id, base64Str, nombreArchivo) {
-  const { sheets, drive } = getApis();
-  if (!drive || !sheets) throw new Error("Google APIs no inicializadas");
+  const { sheets } = getApis();
+  if (!sheets) throw new Error("Google APIs no inicializadas");
+
+  // Las fotos las sube un admin con su propio permiso: la cuenta de servicio
+  // no tiene cuota en Drive y Google no la deja ser dueña de archivos.
+  const drive = driveUsuario.clienteDrive(sheetId);
+  if (!drive) throw new Error('Un admin debe autorizar Drive para poder guardar fotos (botón "Autorizar Drive" en el panel de control).');
 
   const art = await ubicarArticulo(sheetId, id);
 
@@ -664,7 +664,7 @@ async function subirFoto(sheetId, email, id, base64Str, nombreArchivo) {
 
   const stream = require('stream');
   const subir = async () => {
-    const folderId = await carpetaFotos(sheetId);
+    const folderId = await carpetaFotos(sheetId, drive);
     const body = new stream.PassThrough();
     body.end(buffer); // un stream nuevo en cada intento
     return drive.files.create({
@@ -678,6 +678,9 @@ async function subirFoto(sheetId, email, id, base64Str, nombreArchivo) {
   try {
     fileRes = await conReintentos(subir, 'subir foto');
   } catch (err) {
+    if (/invalid_grant/i.test(err.message || '')) {
+      throw new Error('La autorización de Drive venció o fue revocada: un admin debe volver a autorizar Drive.');
+    }
     // La carpeta guardada pudo haberse borrado: se busca de nuevo una vez
     if (!_carpetaFotos.has(sheetId) || !/not found|404/i.test(err.message || '')) throw err;
     _carpetaFotos.delete(sheetId);
@@ -1041,6 +1044,7 @@ module.exports = {
   getFilasPorZona,
   buscarEnInventario,
   articulosConFoto,
+  olvidarCarpetaFotos,
   obtenerZonasAdmin,
   subirFoto: conInvalidacion(subirFoto),
   registrarReporte: conInvalidacion(registrarReporte),

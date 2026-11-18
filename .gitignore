@@ -17,3 +17,6 @@ sessions/
 
 # Índices de búsqueda por foto (se regeneran solos)
 embeddings/
+
+# Permisos de Drive de los admins (refresh tokens): nunca al repo
+drive-tokens/

@@ -159,3 +159,51 @@ test('buscar por foto: exige sesión, rechaza imágenes vacías y el dashboard o
     assert.ok(dash.texto.includes('Buscar por foto'));
   } finally { await s.parar(); }
 });
+
+test('autorizar Drive: solo admins, con estado anti-falsificación, y el permiso queda guardado', async () => {
+  const tokens = fs.mkdtempSync(path.join(os.tmpdir(), 'invlab-tokens-'));
+  const env = { MODO_DEMO: 'NO', GOOGLE_CLIENT_ID: 'cliente-id', GOOGLE_CLIENT_SECRET: 'secreto', APP_BASE_URL: 'http://127.0.0.1', DRIVE_TOKENS_DIR: tokens };
+
+  // Se crea una sesión entrando en modo demo y se reabre sin demo (invitado@demo.com es ADMIN en la planilla simulada)
+  let s = await arrancar({ ...env, MODO_DEMO: 'SI', DEMO_ROL: 'ADMIN' });
+  const http = cliente();
+  await http(s.base);
+  const sesiones = path.join(s.tmp, 'sessions');
+  await s.parar();
+
+  s = await arrancar({ ...env, SESSIONS_DIR: sesiones });
+  try {
+    const raiz = `http://127.0.0.1:${new URL(s.base).port}`;
+    // sin sesión: al login
+    assert.match((await cliente()(`${s.base}/auth/drive`)).location, /\/login$/);
+
+    // con sesión de admin: redirige a Google pidiendo solo drive.file
+    const ini = await http(`${s.base}/auth/drive`);
+    assert.equal(ini.status, 302);
+    const u = new URL(ini.location);
+    assert.equal(u.searchParams.get('scope'), 'https://www.googleapis.com/auth/drive.file');
+    const state = u.searchParams.get('state');
+    assert.ok(state && state.length >= 32);
+
+    // el panel avisa que falta autorizar
+    assert.ok((await http(s.base)).texto.includes('Autorizar Drive para guardar fotos'));
+
+    // estado falso o ausente: rechazado y sin guardar nada
+    assert.equal((await http(`${raiz}/inventariolab/auth/drive/callback?state=falso&code=c`)).status, 400);
+    assert.equal(fs.readdirSync(tokens).length, 0);
+
+    // estado correcto: guarda el permiso y vuelve al panel
+    const ok = await http(`${raiz}/inventariolab/auth/drive/callback?state=${state}&code=codigo-ok`);
+    assert.equal(ok.status, 302);
+    assert.match(ok.location, /\/lab\/LABTEST\?drive=ok$/);
+    assert.deepEqual(fs.readdirSync(tokens), ['LABTEST.json']);
+
+    // el estado es de un solo uso
+    assert.equal((await http(`${raiz}/inventariolab/auth/drive/callback?state=${state}&code=codigo-ok`)).status, 400);
+
+    // ya autorizado: el aviso desaparece y se muestra la confirmación
+    const panel = await http(`${s.base}?drive=ok`);
+    assert.ok(!panel.texto.includes('Autorizar Drive para guardar fotos'));
+    assert.ok(panel.texto.includes('Drive autorizado'));
+  } finally { await s.parar(); }
+});

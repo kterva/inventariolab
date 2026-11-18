@@ -116,7 +116,19 @@ let proximoSheetId = 100;
 
 const fake = {
   google: {
-    auth: { GoogleAuth: class { constructor() { st.authCreados++; } } },
+    auth: {
+      GoogleAuth: class { constructor() { st.authCreados++; } },
+      // Cliente OAuth simulado: el código 'sin-refresh' no trae refresh token y 'malo' falla
+      OAuth2: class {
+        constructor(id, secreto, retorno) { this.retorno = retorno; }
+        generateAuthUrl(o) { return 'https://accounts.example/auth?' + new URLSearchParams({ state: o.state, scope: o.scope.join(' '), access_type: o.access_type, prompt: o.prompt, redirect_uri: this.retorno, login_hint: o.login_hint || '' }); }
+        async getToken(code) {
+          if (code === 'malo') throw new Error('invalid_grant');
+          return { tokens: code === 'sin-refresh' ? { access_token: 'a' } : { access_token: 'a', refresh_token: 'rt-' + code } };
+        }
+        setCredentials() {}
+      },
+    },
     drive: () => ({
       files: {
         get: async () => ({ data: { parents: ['carpeta-lab'] } }),

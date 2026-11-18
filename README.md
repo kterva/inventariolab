@@ -60,6 +60,7 @@ npm start              # o: npm run dev
 | `SESSIONS_DIR` | Carpeta de las sesiones (por defecto `./sessions`). |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Clave JSON de la cuenta de servicio, en una sola línea y entre comillas simples. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Cliente OAuth web para el login. |
+| `DRIVE_TOKENS_DIR` | Dónde se guarda el permiso de Drive de los admins (por defecto `./drive-tokens`, modo 700/600, ignorada por git). |
 | `SHEETS_CACHE_TTL_MS` | Cuánto se reutiliza una lectura de la planilla (por defecto 30000). |
 | `SHEETS_CACHE_STALE_MAX_MS` | Si Google falla por cuota o red, hasta qué antigüedad se sirve la última copia buena (por defecto 600000). |
 | `GOOGLE_REINTENTOS`, `GOOGLE_BACKOFF_MS` | Reintentos de las escrituras ante 429/5xx o errores de red (por defecto 3, con espera inicial de 500 ms que se duplica en cada intento). Las lecturas ya las reintenta la librería `googleapis`. |
@@ -105,6 +106,7 @@ Las sesiones se guardan en archivos, así que reiniciar no cierra la sesión de 
 | `server.js` | Rutas, autenticación, roles y sesiones. |
 | `googleClient.js` | Acceso a Sheets y Drive, caché de lectura y permisos. |
 | `sessionStore.js` | Almacén de sesiones en archivos. |
+| `driveUsuario.js` | Autorización de Drive con la cuenta de un admin (OAuth, alcance `drive.file`): con ella se suben las fotos. |
 | `busquedaFoto.js` | Búsqueda por foto: embeddings de imagen (DINOv2-small, local), índice por laboratorio, cola y límite por usuario. |
 | `views/*.ejs` | Vistas (portada, login, dashboard, armario, ayuda, privacidad). |
 | `public/` | PWA: manifest, service worker e íconos. |
@@ -126,6 +128,7 @@ Las sesiones se guardan en archivos, así que reiniciar no cierra la sesión de 
   - el email de la cuenta de servicio se toma de la credencial configurada;
   - pruebas automatizadas con `npm test`.
 - **Búsqueda por foto:** desde el dashboard, "📸 Buscar por foto" compara una foto con las fotos guardadas de los artículos y muestra los 3 más parecidos (con enlace al armario), o "Parece ser…" si la similitud supera 0,6. "Ninguno de estos" lleva a la búsqueda por texto y, si es admin, permite guardarle la foto al artículo. Usa DINOv2-small cuantizado con `@huggingface/transformers`, sin servicios externos; los embeddings se guardan en `embeddings/` y se recalculan solos al cambiar una foto. Una búsqueda a la vez, 2 hilos y 10 búsquedas por minuto por usuario. Solo reconoce artículos que ya tienen foto. En una medición con 10 fotos nuevas acertó el artículo entre los 3 primeros en 8.
+- **Subida de fotos con la cuenta de un admin:** las cuentas de servicio no tienen cuota en Drive y Google no las deja ser dueñas de archivos, así que las fotos las sube un admin con su propio permiso (alcance mínimo `drive.file`). Un admin toca "Autorizar Drive" en el panel una sola vez; el permiso se guarda en `DRIVE_TOKENS_DIR`. Las fotos nuevas van a la carpeta `LAB_FOTOS (InventarioLab)` del Drive de esa cuenta. Requiere registrar `<APP_BASE_URL>/inventariolab/auth/drive/callback` como URI de redirección del cliente OAuth y que la pantalla de consentimiento esté "En producción" (en "Testing" el permiso caduca a los 7 días).
 - **Escrituras robustas:**
   - ID fijo por artículo (columna O) en lugar del número de fila;
   - historial en la hoja `HISTORIAL`, una fila por evento, sin límite de tamaño ni escrituras que se pisen;

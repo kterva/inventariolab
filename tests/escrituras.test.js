@@ -3,6 +3,10 @@
 process.env.GOOGLE_SERVICE_ACCOUNT_JSON = '{}';
 process.env.SHEETS_CACHE_TTL_MS = '50';
 process.env.GOOGLE_BACKOFF_MS = '1';
+// Las fotos se suben con el permiso de un admin: se simula que ya autorizó en estos laboratorios
+const fs = require('fs'), os = require('os'), path = require('path');
+process.env.DRIVE_TOKENS_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'drive-tokens-'));
+for (const lab of ['P4', 'P5']) fs.writeFileSync(path.join(process.env.DRIVE_TOKENS_DIR, lab + '.json'), JSON.stringify({ refresh_token: 'rt', email: 'admin@x.uy' }));
 require('./fake-googleapis');
 const test = require('node:test');
 const assert = require('node:assert');

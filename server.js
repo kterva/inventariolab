@@ -6,6 +6,8 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const googleClient = require('./googleClient');
 const FileSessionStore = require('./sessionStore');
+const crypto = require('crypto');
+const driveUsuario = require('./driveUsuario');
 const { crearBuscadorFoto, crearLimitador, ErrorBusquedaFoto } = require('./busquedaFoto');
 
 const app = express();
@@ -221,7 +223,9 @@ router.get('/lab/:labId', async (req, res) => {
     esAdmin: permisos.esAdmin,
     rol: permisos.rol,
     email,
-    labId 
+    labId,
+    driveAutorizado: driveUsuario.estado(labId).autorizado,
+    driveMsg: String(req.query.drive || '')
   });
 });
 
@@ -233,6 +237,52 @@ router.get('/', (req, res) => {
 
 router.get('/privacidad', (req, res) => {
   res.render('privacidad');
+});
+
+// ─── AUTORIZAR DRIVE (para guardar fotos) ───────────
+// La cuenta de servicio no puede ser dueña de archivos en Drive (no tiene
+// cuota), así que las fotos las sube un admin con su propio permiso.
+router.get('/lab/:labId/auth/drive', async (req, res) => {
+  const { labId } = req.params;
+  const email = req.session.email;
+  if (!email || req.session.labId !== labId) return res.redirect(`/inventariolab/lab/${labId}/login`);
+  if (req.appConfig.isDemo === 'SI') return res.status(400).send('No disponible en modo demo.');
+  if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID === 'test') {
+    return res.status(500).send('Google OAuth no está configurado (falta el Client ID).');
+  }
+  const permisos = await googleClient.verificarPermisos(labId, email);
+  if (!permisos.esAdmin) return res.status(403).send('Solo administradores');
+
+  const state = crypto.randomBytes(24).toString('hex');
+  req.session.driveOAuth = { state, labId };
+  req.session.save(err => {
+    if (err) return res.status(500).send('No se pudo iniciar la autorización.');
+    res.redirect(driveUsuario.urlAutorizacion(state, email));
+  });
+});
+
+router.get('/auth/drive/callback', async (req, res) => {
+  const pendiente = req.session.driveOAuth;
+  const email = req.session.email;
+  if (!pendiente || !email || !req.query.state || req.query.state !== pendiente.state) {
+    return res.status(400).send('Solicitud de autorización inválida o vencida. Volvé al panel y probá de nuevo.');
+  }
+  const { labId } = pendiente;
+  delete req.session.driveOAuth;
+  const volver = resultado => res.redirect(`/inventariolab/lab/${encodeURIComponent(labId)}?drive=${resultado}`);
+
+  if (req.query.error || !req.query.code) return volver('cancelado');
+  try {
+    // se vuelve a comprobar que sigue siendo admin: el permiso queda guardado para toda la app
+    const permisos = await googleClient.verificarPermisos(labId, email);
+    if (!permisos.esAdmin) return res.status(403).send('Solo administradores');
+    await driveUsuario.guardarDesdeCodigo(labId, req.query.code, email);
+    googleClient.olvidarCarpetaFotos(labId);
+    volver('ok');
+  } catch (err) {
+    console.error('[auth/drive]', err.message);
+    volver('error');
+  }
 });
 
 router.get('/ayuda', (req, res) => {
