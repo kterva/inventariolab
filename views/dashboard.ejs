@@ -61,6 +61,10 @@
       <h3>🔍 Buscador Global</h3>
       <p>Localiza stock y ubicación por nombre o coincidencia parcial.</p>
     </div>
+    <div class="card" onclick="showView('foto')">
+      <h3>📸 Buscar por foto</h3>
+      <p>Sacá una foto de un material y te mostramos cuál es y en qué armario está.</p>
+    </div>
     <% if (esAdmin && typeof email !== 'undefined' && email === 'trujillo.leonardo@gmail.com') { %>
     <div class="card" onclick="loadNoPhoto()">
       <h3>📷 Faltan Fotos</h3>
@@ -87,6 +91,15 @@
       <button onclick="doSearch()" style="width: 120px; margin-top: 10px;">🔍 Buscar</button>
     </div>
     <div id="searchResults"></div>
+  </div>
+
+  <div id="view-foto" class="hidden">
+    <button onclick="history.back()">← Volver</button>
+    <h2>Buscar por foto <span class="tooltip-icon" data-tip="Compara tu foto con las fotos ya guardadas. Solo reconoce materiales que ya tienen foto">i</span></h2>
+    <input type="file" id="fotoInput" accept="image/*" capture="environment" style="display:none" onchange="buscarPorFoto(this)">
+    <button onclick="document.getElementById('fotoInput').click()">📸 Sacar o elegir una foto</button>
+    <img id="fotoPrevia" alt="" style="display:none; max-width:100%; max-height:240px; border-radius:8px; margin:10px auto 0;">
+    <div id="fotoResultados"></div>
   </div>
 
   <div id="view-explore" class="hidden">
@@ -232,9 +245,99 @@
   }
 
   function mostrarVistaInterna(viewId) {
-    ['home', 'search', 'explore', 'zones', 'nophoto'].forEach(v => document.getElementById('view-' + v).classList.add('hidden'));
+    ['home', 'search', 'explore', 'zones', 'nophoto', 'foto'].forEach(v => document.getElementById('view-' + v).classList.add('hidden'));
     document.getElementById('view-' + viewId).classList.remove('hidden');
     if(viewId === 'search') document.getElementById('searchInput').focus();
+  }
+
+  // ─── BÚSQUEDA POR FOTO ───
+  let fotoPendiente = null; // la última foto buscada (dataURL), por si el admin se la quiere guardar a un artículo
+
+  function reducirImagen(file, maxLado) {
+    return new Promise(function (resolve, reject) {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = function () {
+        const k = Math.min(1, maxLado / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('No se pudo leer la imagen.')); };
+      img.src = url;
+    });
+  }
+
+  function tarjetaFoto(item, destacada) {
+    const ubi = item.ubicacion ? String(item.ubicacion).trim() : '';
+    const link = ubi ? WEB_APP_URL + '?zona=' + encodeURIComponent(ubi) + '#item-' + encodeURIComponent(item.id) : '';
+    const foto = urlSegura(item.foto);
+    return '<div class="result-item" style="display:flex; gap:10px; align-items:center;' + (destacada ? 'background:#eafaf1; border-radius:8px; padding:10px;' : '') + '">' +
+      (foto ? '<img src="' + esc(foto) + '=w160" alt="" style="width:72px; height:72px; object-fit:cover; border-radius:6px; flex:none;">' : '') +
+      '<div style="flex:1; min-width:0;"><strong>' + esc(item.articulo) + '</strong><br><small>📍 ' + esc(ubi || 'Sin ubicación') + '</small></div>' +
+      (link ? '<button style="width:auto; margin:0; padding:8px 12px;" data-href="' + esc(link) + '" onclick="abrirConCarga(this.dataset.href)">Ir al armario →</button>' : '') +
+      '</div>';
+  }
+
+  async function buscarPorFoto(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    const div = document.getElementById('fotoResultados');
+    div.innerHTML = '<div class="loader">⏳ Analizando la foto… la primera búsqueda del día puede tardar un poco.</div>';
+    try {
+      const dataUrl = await reducirImagen(file, 800);
+      fotoPendiente = dataUrl;
+      const previa = document.getElementById('fotoPrevia');
+      previa.src = dataUrl; previa.style.display = 'block';
+
+      const res = await fetch(`/inventariolab/lab/${LAB_ID}/api/buscar-foto`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ base64: dataUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error de servidor');
+
+      if (!data.resultados.length) {
+        div.innerHTML = '<div class="loader">Todavía no hay fotos guardadas con las que comparar.</div>' + botonNinguno();
+        return;
+      }
+      let html = data.coincide
+        ? '<h3 style="color:#1e8449;">✅ Parece ser:</h3>' + tarjetaFoto(data.resultados[0], true) +
+          (data.resultados.length > 1 ? '<h4>Otros parecidos</h4>' + data.resultados.slice(1).map(r => tarjetaFoto(r, false)).join('') : '')
+        : '<h3>No estoy seguro. Los más parecidos:</h3>' + data.resultados.map(r => tarjetaFoto(r, false)).join('');
+      div.innerHTML = html + botonNinguno();
+    } catch (err) {
+      div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ ' + esc(err.message) + '</div>';
+    }
+  }
+
+  function botonNinguno() {
+    return '<button style="background:#7f8c8d; margin-top:14px;" onclick="ningunoDeEstos()">Ninguno de estos</button>';
+  }
+
+  function ningunoDeEstos() {
+    showView('search');
+    const div = document.getElementById('searchResults');
+    div.innerHTML = '<div class="loader">Buscalo por nombre.' + (ES_ADMIN ? ' Al encontrarlo, podés guardarle la foto que sacaste.' : '') + '</div>';
+  }
+
+  async function guardarFotoPendiente(btn) {
+    if (!fotoPendiente || !btn.dataset.id) return;
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    try {
+      const res = await fetch(`/inventariolab/lab/${LAB_ID}/api/foto`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: btn.dataset.id, base64: fotoPendiente, nombreArchivo: 'busqueda.jpg' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error de servidor');
+      btn.textContent = '✅ Foto guardada';
+      fotoPendiente = null;
+    } catch (err) {
+      btn.disabled = false; btn.textContent = '❌ ' + err.message;
+    }
   }
 
   async function doSearch() {
@@ -268,6 +371,7 @@
         htmlStr += '<div class="result-item" ' + clickAttr + ' ' + styleAttr + '>' +
           '<strong>' + esc(item.articulo) + icon + '</strong><br>' +
           '<small>📍 ' + esc(ubi || 'Sin ubicación') + ' | ✅ ' + esc(item.bien) + ' | ⚠️ ' + esc(item.regular) + ' | ❌ ' + esc(item.roto) + '</small>' +
+          (ES_ADMIN && fotoPendiente && item.id ? '<br><button style="width:auto; margin:6px 0 0; padding:6px 10px;" data-id="' + esc(item.id) + '" onclick="event.stopPropagation(); guardarFotoPendiente(this)">📸 Guardar mi foto en este artículo</button>' : '') +
           '</div>';
       });
       div.innerHTML = htmlStr;

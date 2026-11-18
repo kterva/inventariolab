@@ -14,3 +14,6 @@ yarn-error.log*
 service-account*.json
 client_secret*.json
 sessions/
+
+# Índices de búsqueda por foto (se regeneran solos)
+embeddings/

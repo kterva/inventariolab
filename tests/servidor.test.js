@@ -142,3 +142,20 @@ test('producción no arranca con el SESSION_SECRET de ejemplo', async () => {
   assert.match(s.salida(), /SESSION_SECRET falta o es inseguro/);
   await s.parar();
 });
+
+test('buscar por foto: exige sesión, rechaza imágenes vacías y el dashboard ofrece la función', async () => {
+  let s = await arrancar({ MODO_DEMO: 'NO' });
+  try {
+    const sinSesion = await cliente()(`${s.base}/api/buscar-foto`, { method: 'POST', body: JSON.stringify({ base64: 'data:image/jpeg;base64,AAAA' }) });
+    assert.equal(sinSesion.status, 401);
+  } finally { await s.parar(); }
+
+  s = await arrancar({ MODO_DEMO: 'SI', DEMO_ROL: 'LECTOR' });
+  try {
+    const http = cliente();
+    const vacia = await http(`${s.base}/api/buscar-foto`, { method: 'POST', body: JSON.stringify({ base64: '' }) });
+    assert.equal(vacia.status, 400);
+    const dash = await http(s.base);
+    assert.ok(dash.texto.includes('Buscar por foto'));
+  } finally { await s.parar(); }
+});

@@ -508,6 +508,14 @@ async function buscarEnInventario(sheetId, query) {
   }
 }
 
+/** Artículos con ID y foto, para el índice de búsqueda por foto */
+async function articulosConFoto(sheetId) {
+  const datos = await cargarLab(sheetId);
+  return filasDeDatos(datos)
+    .map(({ row }) => ({ id: idDeFila(row), articulo: row[COL.ART] || '', ubicacion: (row[COL.ZONA] || '').toString().trim(), foto: (row[COL.FOTO] || '').toString().trim() }))
+    .filter(a => a.id && a.foto);
+}
+
 /** Devuelve la lista de zonas desde la hoja ubicaciones */
 async function obtenerZonasAdmin(sheetId) {
   try {
@@ -1032,6 +1040,7 @@ module.exports = {
   permisosDeRol,
   getFilasPorZona,
   buscarEnInventario,
+  articulosConFoto,
   obtenerZonasAdmin,
   subirFoto: conInvalidacion(subirFoto),
   registrarReporte: conInvalidacion(registrarReporte),

@@ -105,6 +105,7 @@ Las sesiones se guardan en archivos, así que reiniciar no cierra la sesión de 
 | `server.js` | Rutas, autenticación, roles y sesiones. |
 | `googleClient.js` | Acceso a Sheets y Drive, caché de lectura y permisos. |
 | `sessionStore.js` | Almacén de sesiones en archivos. |
+| `busquedaFoto.js` | Búsqueda por foto: embeddings de imagen (DINOv2-small, local), índice por laboratorio, cola y límite por usuario. |
 | `views/*.ejs` | Vistas (portada, login, dashboard, armario, ayuda, privacidad). |
 | `public/` | PWA: manifest, service worker e íconos. |
 | `WebApp.js`, `Index.html`, `Gatillos.js`, `GenerarQR_PRO.js`, `Gestion_Incidencias.js`, `Recuperar_reportes.js`, `appsscript.json`, `.clasp.json` | **Versión 1.x (Google Apps Script)**, conservada como referencia; la app de Node no los usa. |
@@ -124,6 +125,7 @@ Las sesiones se guardan en archivos, así que reiniciar no cierra la sesión de 
   - migración a un proyecto propio de Google Cloud (cuenta de servicio y cliente OAuth nuevos);
   - el email de la cuenta de servicio se toma de la credencial configurada;
   - pruebas automatizadas con `npm test`.
+- **Búsqueda por foto:** desde el dashboard, "📸 Buscar por foto" compara una foto con las fotos guardadas de los artículos y muestra los 3 más parecidos (con enlace al armario), o "Parece ser…" si la similitud supera 0,6. "Ninguno de estos" lleva a la búsqueda por texto y, si es admin, permite guardarle la foto al artículo. Usa DINOv2-small cuantizado con `@huggingface/transformers`, sin servicios externos; los embeddings se guardan en `embeddings/` y se recalculan solos al cambiar una foto. Una búsqueda a la vez, 2 hilos y 10 búsquedas por minuto por usuario. Solo reconoce artículos que ya tienen foto. En una medición con 10 fotos nuevas acertó el artículo entre los 3 primeros en 8.
 - **Escrituras robustas:**
   - ID fijo por artículo (columna O) en lugar del número de fila;
   - historial en la hoja `HISTORIAL`, una fila por evento, sin límite de tamaño ni escrituras que se pisen;

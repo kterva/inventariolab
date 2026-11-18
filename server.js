@@ -6,6 +6,7 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const googleClient = require('./googleClient');
 const FileSessionStore = require('./sessionStore');
+const { crearBuscadorFoto, crearLimitador, ErrorBusquedaFoto } = require('./busquedaFoto');
 
 const app = express();
 app.set('trust proxy', 1); // Confiar en el proxy de Nginx
@@ -316,6 +317,30 @@ router.get('/lab/:labId/api/buscar', apiAuth, async (req, res) => {
     res.json(resultados);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Búsqueda por foto: compara con las fotos guardadas y devuelve los 3 más parecidos
+const buscadorFoto = crearBuscadorFoto();
+const permitirBusquedaFoto = crearLimitador(10, 60000);
+
+router.post('/lab/:labId/api/buscar-foto', apiAuth, async (req, res) => {
+  try {
+    if (!permitirBusquedaFoto(req.userEmail)) {
+      return res.status(429).json({ error: 'Demasiadas búsquedas por foto seguidas. Esperá un minuto.' });
+    }
+    const partes = String((req.body && req.body.base64) || '').split(',');
+    const imagen = Buffer.from(partes[partes.length - 1], 'base64');
+    if (!imagen.length) return res.status(400).json({ error: 'La imagen llegó vacía.' });
+    if (imagen.length > 4 * 1024 * 1024) return res.status(413).json({ error: 'La imagen es demasiado grande.' });
+
+    const articulos = await googleClient.articulosConFoto(req.params.labId);
+    const { resultados, coincide, indexados } = await buscadorFoto.buscar(req.params.labId, articulos, imagen, 3);
+    res.json({ resultados, coincide, indexados });
+  } catch (err) {
+    if (err instanceof ErrorBusquedaFoto && err.codigo === 'OCUPADO') return res.status(429).json({ error: err.message });
+    console.error('[buscar-foto]', err);
+    res.status(500).json({ error: 'No se pudo analizar la foto.' });
   }
 });
 
