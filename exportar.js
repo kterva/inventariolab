@@ -64,7 +64,7 @@ function celdaCsv(valor) {
 }
 
 const LEEME = [
-  'Fotos de tu laboratorio (exportadas de InventarioLab).',
+  'Fotos de tu laboratorio (exportadas de Inventario Laboratorio).',
   '',
   '- fotos/    una imagen por artículo, con el nombre "ID_artículo.ext".',
   '- indice.csv  qué artículo es cada archivo, dónde está guardado y si alguna foto no se pudo bajar.',

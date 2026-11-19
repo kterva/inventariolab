@@ -50,7 +50,7 @@ async function canjearCodigo(code) {
   const auth = clienteOAuth();
   const { tokens } = await auth.getToken(code);
   if (!tokens.refresh_token) {
-    throw new Error('Google no entregó el permiso permanente. Quitá el acceso de InventarioLab en https://myaccount.google.com/permissions y probá de nuevo.');
+    throw new Error('Google no entregó el permiso permanente. Quitá el acceso de Inventario Laboratorio en https://myaccount.google.com/permissions y probá de nuevo.');
   }
   auth.setCredentials(tokens);
   return { tokens, auth };
