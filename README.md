@@ -1,4 +1,4 @@
-# InventarioLab 📦
+# Inventario Laboratorio 📦
 
 Gestor de inventario de código abierto para los laboratorios de Educación Media de Uruguay y Latinoamérica. Cada centro usa **su propia planilla de Google Sheets** como base de datos, y la aplicación agrega búsqueda, vista por armario con códigos QR, fotos, reportes de incidencias e historial de cambios.
 
@@ -15,7 +15,8 @@ Navegador ──► Cloudflare ──► nginx ──► Node.js/Express (PM2)
 ```
 
 - Cada laboratorio se identifica por el **ID de su planilla**: `/inventariolab/lab/<ID>`.
-- La app accede a las planillas con una **cuenta de servicio** de Google. Cada liceo comparte su planilla con el email de esa cuenta como **Editor**; la portada y la pantalla de error muestran cuál es.
+- **Laboratorios propios (recomendado):** cada docente toca «Crear mi laboratorio» (o «Importar mi planilla») y la app crea la planilla y la carpeta de fotos en **su** Google Drive con el permiso `drive.file`; el refresh token queda en `drive-tokens/<ID>.json` (modo 600). «Exportar mis datos» baja la planilla en `.xlsx` y las fotos en un ZIP. Detalles y diseño en [`docs/laboratorios-propios.md`](docs/laboratorios-propios.md); guía para docentes en [`docs/guia-docentes.md`](docs/guia-docentes.md).
+- **Laboratorios con cuenta de servicio (versión anterior, siguen funcionando):** la app accede a la planilla con una **cuenta de servicio** de Google. El liceo comparte su planilla con el email de esa cuenta como **Editor**; la portada y la pantalla de error muestran cuál es.
 - Los usuarios inician sesión con **Google OAuth** (solo nombre y email).
 - Las **fotos las sube un administrador con su propia cuenta** (OAuth, alcance `drive.file`), no la cuenta de servicio: las cuentas de servicio no tienen cuota de almacenamiento en Drive y Google no las deja ser dueñas de archivos. Un admin toca "Autorizar Drive" una vez en el panel; las fotos van a la carpeta `LAB_FOTOS (InventarioLab)` de su Drive.
 - La **búsqueda por foto** corre en el propio servidor (sin servicios externos): compara la foto con las de los artículos mediante embeddings de imagen.

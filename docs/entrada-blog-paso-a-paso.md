@@ -1,9 +1,7 @@
 <!--
 Texto para reemplazar la parte de instalación de la entrada
 https://leonardotrujillo.uy/soberania-tecnologica-en-el-laboratorio-sistema-de-inventario-con-codigos-qr/
-
-BORRADOR. Antes de publicarlo hay que probar "Crear mi laboratorio" con una cuenta real de Google
-en https://culturalibre.edu.uy/inventariolab (todavía solo se probó con Google simulado).
+"Crear mi laboratorio" ya se probó con una cuenta real de Google.
 -->
 
 ## Cómo crear tu propio laboratorio (3 minutos, sin instalar nada)
@@ -12,7 +10,7 @@ Antes había que copiar una planilla, publicar un script de Google Apps Script y
 
 1. **Entrá a [culturalibre.edu.uy/inventariolab](https://culturalibre.edu.uy/inventariolab)** y tocá **«✨ Crear mi laboratorio»**.
 2. **Escribí el nombre de tu centro y el del laboratorio** (por ejemplo, «Liceo Sauce 2» y «Laboratorio de Física») y tocá **Continuar con Google**.
-3. **Elegí tu cuenta de Google y aceptá los permisos.** Google te dice que InventarioLab quiere ver tu correo (para dejarte como administrador) y crear y usar **solo los archivos que crea la propia aplicación**: tu planilla y la carpeta de fotos. No puede ver el resto de tu Drive, y podés quitar el permiso cuando quieras en [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
+3. **Elegí tu cuenta de Google y aceptá los permisos.** Google te dice que Inventario Laboratorio quiere ver tu correo (para dejarte como administrador) y crear y usar **solo los archivos que crea la propia aplicación**: tu planilla y la carpeta de fotos. No puede ver el resto de tu Drive, y podés quitar el permiso cuando quieras en [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
 4. **Listo.** En tu Drive aparecen la planilla del inventario y la carpeta de fotos, y entrás al panel como administrador.
 
 ### Lo que conviene saber
@@ -24,7 +22,8 @@ Antes había que copiar una planilla, publicar un script de Google Apps Script y
   - `VISOR`: solo mira.
   Quien no esté en `config` ve «acceso denegado».
 - **Dentro de la aplicación:** creá tus armarios en «Impresión de QRs y Gestión de Zonas», cargá los materiales en la pestaña `INVENTARIO` de tu planilla (indicando el armario en la columna «Ubicación») e imprimí los QR para pegarlos en las puertas.
-- **Si ya tenías una planilla propia** de la versión anterior, la podés seguir usando: hay que compartirla como Editora con el correo del servidor y pegar su enlace en la pantalla principal (el paso a paso está en la [ayuda](https://culturalibre.edu.uy/inventariolab/ayuda), en «alternativa»). Los QR que ya imprimiste siguen funcionando.
+- **Si ya tenés tu inventario en otra planilla**, tocá **«📥 Importar mi planilla»** en la pantalla principal: elegís tu planilla con el selector de Google, indicás qué columna es cada cosa y la aplicación copia los datos a un laboratorio nuevo. **Tu planilla original no se modifica.** Las fotos no se copian.
+- **Si usabas la versión anterior**, tu laboratorio sigue funcionando igual, y los QR que ya imprimiste también. El método viejo (compartir la planilla con el correo del servidor) está en la [ayuda](https://culturalibre.edu.uy/inventariolab/ayuda), en «alternativa».
 - **Privacidad:** el servidor no guarda una base de datos con tus datos: el inventario vive en tu planilla. Quien administra el servidor recibe un aviso con tu correo cuando creás un laboratorio. Más detalles en la [política de privacidad](https://culturalibre.edu.uy/inventariolab/privacidad).
 
 ### Código fuente
