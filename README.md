@@ -175,3 +175,7 @@ Desarrollada 100 % sobre Google Apps Script, que servía el HTML y usaba la plan
 - Cada laboratorio nuevo necesita que un administrador autorice Drive una vez. Las fotos quedan en el Drive de esa cuenta.
 - La búsqueda por foto solo reconoce artículos que ya tienen foto, y su acierto se midió con pocas fotos (8 de 10 entre los 3 primeros). Conviene volver a medir con más fotos.
 - La vista del armario muestra el último evento de `HISTORIAL`; las ediciones hechas a mano en la planilla siguen yendo a la columna J (si la planilla tiene el script de Apps Script) y solo se muestran cuando el artículo no tiene eventos en `HISTORIAL`.
+
+## Licencia
+
+Software libre bajo la **Licencia Pública General GNU, versión 3 o posterior** (GPL-3.0-or-later). Ver [LICENSE](LICENSE). Las bibliotecas y datos de terceros incluidos conservan su propia licencia.
