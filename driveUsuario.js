@@ -86,6 +86,7 @@ async function identificarYConectar(code) {
   return {
     email: datos.email.toLowerCase(),
     refreshToken: tokens.refresh_token,
+    accessToken: tokens.access_token, // solo para el selector de archivos de Google, que corre en el navegador
     sheets: google.sheets({ version: 'v4', auth }),
     drive: google.drive({ version: 'v3', auth }),
   };

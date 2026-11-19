@@ -61,7 +61,7 @@
     <h2>Panel de Control <span class="tooltip-icon" data-tip="Menú principal para acceder a todas las funciones del sistema">i</span></h2>
     <% if (typeof driveMsg !== 'undefined' && driveMsg) { %>
     <div class="card" style="cursor:default; border-left:5px solid <%= (driveMsg === 'ok' || driveMsg === 'creado') ? '#27ae60' : '#e74c3c' %>;">
-      <%= driveMsg === 'creado' ? '🎉 Tu laboratorio está creado. La planilla y la carpeta de fotos están en tu Google Drive. Entrá a "Zonas" para crear las primeras ubicaciones.' : driveMsg === 'ok' ? '✅ Drive autorizado. Ya se pueden guardar fotos.' : (driveMsg === 'cancelado' ? 'Autorización cancelada. Las fotos no se podrán guardar hasta autorizar Drive.' : '❌ No se pudo autorizar Drive. Probá de nuevo.') %>
+      <%= driveMsg === 'creado' ? (importados > 0 ? '🎉 Importamos ' + importados + ' artículos a tu laboratorio nuevo. Tu planilla original quedó como estaba. La planilla nueva y la carpeta de fotos están en tu Google Drive; las fotos se pueden agregar desde la aplicación.' : '🎉 Tu laboratorio está creado. La planilla y la carpeta de fotos están en tu Google Drive. Entrá a "Zonas" para crear las primeras ubicaciones.') : driveMsg === 'ok' ? '✅ Drive autorizado. Ya se pueden guardar fotos.' : (driveMsg === 'cancelado' ? 'Autorización cancelada. Las fotos no se podrán guardar hasta autorizar Drive.' : '❌ No se pudo autorizar Drive. Probá de nuevo.') %>
     </div>
     <% } %>
     <% if (esAdmin && typeof driveAutorizado !== 'undefined' && !driveAutorizado) { %>

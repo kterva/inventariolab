@@ -77,6 +77,8 @@ Solo para admins, desde la tarjeta "Exportar mis datos" del panel. Disponible en
 
 Con el Picker el docente elige su planilla. La app **no la modifica**: la lee, muestra las columnas y deja asignar cuáles son artículo, cantidades, zona y foto. Después crea una planilla **nueva** con la estructura de la plantilla y copia los datos. Así se evita adaptar en el lugar planillas con estructuras muy distintas, y el original queda intacto.
 
+**Implementado:** `/importar` (mismo ingreso, topes y anti-bots que «Crear») → selector de Google (`views/importar-elegir.ejs`, token de acceso con `drive.file` entregado al navegador, `appId` = número de proyecto sacado del Client ID) → elegir hoja, fila de títulos y columna de cada campo (`views/importar-mapear.ejs`, con columnas adivinadas) → crea el laboratorio, asigna IDs `A0001…`, crea las zonas (`Z01…`) con las ubicaciones distintas y copia hasta 2000 artículos. Las fotos no se copian. Hasta crear el laboratorio las credenciales viven solo en memoria (30 minutos).
+
 ### 6. Relevo y reconexión
 
 Todo el laboratorio depende del permiso de una sola cuenta. Hace falta que otro admin pueda **tomar la conexión**: repite el flujo con el Picker sobre la misma planilla (que el dueño ya le compartió) y reemplaza el token. Sirve también cuando el docente revoca el permiso o cambia de cuenta. Si el token falla (`invalid_grant`), la app lo dice y sigue mostrando la última copia guardada, como ya hace con los errores de Google.
@@ -107,7 +109,7 @@ Una ventaja de pasar a permisos de usuario: la cuota de la API de Sheets es por 
 | 1 | ✅ `getApis(labId)` y modo usuario (hecho; vive en `driveUsuario.js` y `googleClient.js`, no en un archivo aparte); pruebas de aislamiento en `tests/credencialesLab.test.js` | bajo |
 | 2 | ✅ `plantilla.js` y "Crear mi laboratorio" (hecho; `tests/plantilla.test.js` y dos pruebas en `tests/servidor.test.js`) | medio |
 | 3 | ✅ Exportar planilla y ZIP de fotos (hecho; `exportar.js`, `tests/exportar.test.js`) | bajo |
-| 4 | Importar con Picker y mapeo | medio |
+| 4 | ✅ Importar con Picker y mapeo (hecho; `importar.js`, `tests/importar.test.js`, prueba en `tests/servidor.test.js`). El Picker real solo se prueba en producción: necesita el origen JS del dominio en la consola de Google | medio |
 | 5 | Relevo y reconexión, desconectar y borrar, cifrado de tokens, QR cortos | medio |
 
 Los QR cortos (`/q/<código>` → dirección del laboratorio) permiten cambiar de servidor sin reimprimir; pueden esperar a la fase 5.

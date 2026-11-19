@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Elegir mi planilla - Inventario Laboratorio</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #f2f4f7; color: #1a1a1a; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1.5rem; box-sizing: border-box; }
+    .card { background: #fff; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); max-width: 760px; width: 100%; border-top: 5px solid #27ae60; }
+    h1 { font-size: 1.4rem; color: #1a5276; margin: 0 0 .5rem; }
+    p, li { color: #4a5568; font-size: .95rem; line-height: 1.5; }
+    label { display: block; font-weight: bold; margin: 1rem 0 .4rem; color: #2c3e50; font-size: .9rem; }
+    input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
+    input:focus { outline: none; border-color: #27ae60; }
+    button { width: 100%; margin-top: 1.5rem; padding: 14px; background: #27ae60; color: #fff; border: none; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; }
+    button:hover { background: #219653; }
+    .error { background: #fdecea; border-left: 5px solid #e74c3c; padding: .8rem 1rem; border-radius: 6px; color: #922b21; margin: 1rem 0; font-size: .95rem; }
+    .nota { background: #e8f4f8; border: 1px solid #bce0ee; border-radius: 8px; padding: .8rem 1rem; margin-top: 1.2rem; font-size: .88rem; }
+    .nota ul { margin: .4rem 0 0; padding-left: 1.2rem; }
+    a { color: #1a5276; }
+    table { border-collapse: collapse; width: 100%; font-size: .85rem; margin: .5rem 0; }
+    th, td { border: 1px solid #dde; padding: 4px 8px; text-align: left; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    th { background: #eef2f6; }
+    .tabla { overflow-x: auto; }
+    select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; background: #fff; }
+    .fila { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem 1rem; }
+    @media (max-width: 560px) { .fila { grid-template-columns: 1fr; } }
+    .sec { background: #fff; color: #1a5276; border: 1px solid #1a5276; margin-top: .5rem; width: auto; padding: 8px 14px; font-size: .9rem; }
+  </style>
+  <link rel="icon" href="/inventariolab/public/app_icon">
+</head>
+<body>
+  <div class="card">
+    <h1>Elegí tu planilla</h1>
+    <p>Se abre el selector de Google Drive. Elegí la planilla donde tenés tu inventario. La aplicación solo podrá leer esa planilla, <strong>no la modifica</strong> y no ve el resto de tu Drive.</p>
+    <% if (error) { %><div class="error"><%= error %></div><% } %>
+    <div id="aviso" class="error" style="display:none"></div>
+    <button type="button" id="abrir">Abrir el selector de Google Drive</button>
+    <form id="envio" method="post" action="/inventariolab/importar/origen" style="display:none">
+      <input type="hidden" name="fileId" id="fileId">
+    </form>
+    <p style="margin-top:1.5rem;font-size:.85rem;"><a href="/inventariolab">Cancelar</a></p>
+  </div>
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script>
+    (function () {
+      var token = <%- JSON.stringify(accessToken).replace(/</g, '\\u003c') %>;
+      var appId = <%- JSON.stringify(appId).replace(/</g, '\\u003c') %>;
+      var aviso = document.getElementById('aviso');
+      function mostrar(t) { aviso.textContent = t; aviso.style.display = 'block'; }
+      var cargado = false;
+      function cargar(cb) {
+        if (cargado) return cb();
+        if (!window.gapi) return mostrar('No se pudo cargar el selector de Google. Revisá tu conexión y recargá la página.');
+        gapi.load('picker', { callback: function () { cargado = true; cb(); }, onerror: function () { mostrar('No se pudo cargar el selector de Google.'); } });
+      }
+      function abrir() {
+        if (!token) return mostrar('Falta el permiso de Google. Empezá de nuevo desde la portada.');
+        cargar(function () {
+          var vista = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS).setMode(google.picker.DocsViewMode.LIST);
+          new google.picker.PickerBuilder()
+            .addView(vista)
+            .setOAuthToken(token)
+            .setAppId(appId)
+            .setLocale('es')
+            .setCallback(function (r) {
+              if (r.action === google.picker.Action.PICKED && r.docs && r.docs[0]) {
+                document.getElementById('fileId').value = r.docs[0].id;
+                document.getElementById('envio').submit();
+              }
+            })
+            .build().setVisible(true);
+        });
+      }
+      document.getElementById('abrir').addEventListener('click', abrir);
+    })();
+  </script>
+</body>
+</html>

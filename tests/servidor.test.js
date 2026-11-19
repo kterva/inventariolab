@@ -441,3 +441,70 @@ test('exportar: solo admins; la planilla sale como .xlsx y el ZIP de fotos es un
     assert.ok(zip.cuerpo.includes(Buffer.from('indice.csv')) && zip.cuerpo.includes(Buffer.from('LEEME.txt')));
   } finally { await s.parar(); }
 });
+
+test('importar mi planilla: elegir con el selector, mapear columnas y copiar a un laboratorio nuevo sin tocar el original', async () => {
+  const tokens = fs.mkdtempSync(path.join(os.tmpdir(), 'invlab-tokens-'));
+  const correos = path.join(tokens, '..', path.basename(tokens) + '-correos.log');
+  const s = await arrancar(ENV_CREAR(tokens, correos));
+  try {
+    const raiz = `http://127.0.0.1:${new URL(s.base).port}/inventariolab`;
+    const http = cliente();
+    const form = (url, datos) => http(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(datos).toString() });
+
+    // la portada lo ofrece y la página pide los nombres
+    assert.ok((await http(raiz)).texto.includes('/inventariolab/importar'));
+    const pagina = await http(`${raiz}/importar`);
+    assert.ok(pagina.texto.includes('Importar mi planilla') && pagina.texto.includes('name="modo" value="importar"'));
+    const token = /name="token" value="([^"]+)"/.exec(pagina.texto)[1];
+
+    // sin sesión de importación no se llega a los pasos siguientes
+    assert.match((await http(`${raiz}/importar/elegir`)).location, /\/importar\?error=vencido$/);
+    assert.match((await form(`${raiz}/importar/crear`, { hoja: '1', enc: '2', articulo: '0' })).location, /\/importar\?error=vencido$/);
+
+    // Google + topes: igual que crear, pero no crea nada todavía
+    const ini = await form(`${raiz}/importar`, { token, modo: 'importar', institucion: 'Liceo Origen', laboratorio: 'Química' });
+    const state = new URL(ini.location).searchParams.get('state');
+    const cb = await http(`${raiz}/auth/drive/callback?state=${state}&code=ana`);
+    assert.match(cb.location, /\/importar\/elegir$/);
+    assert.equal(fs.readdirSync(tokens).length, 0, 'todavía no se guarda ningún permiso');
+    assert.equal(s.escrituras(), 0);
+
+    // pantalla del selector de Google: lleva el token y el número de proyecto, sin guardarse en caché
+    const elegir = await http(`${raiz}/importar/elegir`);
+    assert.equal(elegir.status, 200);
+    assert.ok(elegir.texto.includes('apis.google.com/js/api.js') && elegir.texto.includes('"a"') && elegir.texto.includes('"cliente"'));
+
+    // id inválido o planilla que no se puede abrir: vuelve a elegir
+    assert.match((await form(`${raiz}/importar/origen`, { fileId: '../x' })).location, /\/importar\/elegir\?error=planilla$/);
+
+    // planilla elegida: muestra las hojas y adivina las columnas
+    assert.match((await form(`${raiz}/importar/origen`, { fileId: 'ORIGEN-DEL-DOCENTE' })).location, /\/importar\/mapear$/);
+    const mapear = await http(`${raiz}/importar/mapear?hoja=1&enc=2`);
+    assert.equal(mapear.status, 200);
+    assert.ok(mapear.texto.includes('Probeta') && mapear.texto.includes('Balanza'));
+    assert.match(mapear.texto, /<option value="0" selected>A: Artículo<\/option>/);
+    assert.match(mapear.texto, /<option value="7" selected>H: Ubicación<\/option>/);
+
+    // sin columna de artículo: vuelve al mapeo con el aviso y no crea nada
+    const sinArt = await form(`${raiz}/importar/crear`, { hoja: '1', enc: '2', articulo: '' });
+    assert.match(sinArt.location, /\/importar\/mapear\?hoja=1&enc=2&error=articulo$/);
+    assert.equal(fs.readdirSync(tokens).length, 0);
+
+    // creación: laboratorio nuevo con los datos, ADMIN, aviso por correo
+    const ok = await form(`${raiz}/importar/crear`, { hoja: '1', enc: '2', articulo: '0', bien: '2', regular: '3', roto: '4', ubicacion: '7' });
+    assert.match(ok.location, /\/lab\/PLANILLA-NUEVA-1\?creado=1&importados=3$/);
+    assert.deepEqual(fs.readdirSync(tokens), ['PLANILLA-NUEVA-1.json']);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(tokens, 'PLANILLA-NUEVA-1.json'), 'utf8')).modo, 'usuario');
+    const panel = await http(`${raiz}/lab/PLANILLA-NUEVA-1?creado=1&importados=3`);
+    assert.equal(panel.status, 200);
+    assert.ok(panel.texto.includes('Importamos 3 artículos'));
+    const zona = await http(`${raiz}/lab/PLANILLA-NUEVA-1?zona=Z1`);
+    assert.ok(zona.texto.includes('Probeta') && zona.texto.includes('Balanza'));
+    const [aviso] = await esperarCorreos(correos, 1);
+    assert.match(aviso.text, /Correo: +ana@x\.uy/);
+
+    // un solo intento: repetir no crea otro laboratorio
+    assert.match((await form(`${raiz}/importar/crear`, { hoja: '1', enc: '2', articulo: '0' })).location, /\/importar\?error=vencido$/);
+    assert.equal(fs.readdirSync(tokens).length, 1);
+  } finally { await s.parar(); }
+});

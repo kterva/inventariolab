@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Importar mi planilla - Inventario Laboratorio</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #f2f4f7; color: #1a1a1a; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1.5rem; box-sizing: border-box; }
+    .card { background: #fff; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); max-width: 760px; width: 100%; border-top: 5px solid #27ae60; }
+    h1 { font-size: 1.4rem; color: #1a5276; margin: 0 0 .5rem; }
+    p, li { color: #4a5568; font-size: .95rem; line-height: 1.5; }
+    label { display: block; font-weight: bold; margin: 1rem 0 .4rem; color: #2c3e50; font-size: .9rem; }
+    input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
+    input:focus { outline: none; border-color: #27ae60; }
+    button { width: 100%; margin-top: 1.5rem; padding: 14px; background: #27ae60; color: #fff; border: none; border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; }
+    button:hover { background: #219653; }
+    .error { background: #fdecea; border-left: 5px solid #e74c3c; padding: .8rem 1rem; border-radius: 6px; color: #922b21; margin: 1rem 0; font-size: .95rem; }
+    .nota { background: #e8f4f8; border: 1px solid #bce0ee; border-radius: 8px; padding: .8rem 1rem; margin-top: 1.2rem; font-size: .88rem; }
+    .nota ul { margin: .4rem 0 0; padding-left: 1.2rem; }
+    a { color: #1a5276; }
+    table { border-collapse: collapse; width: 100%; font-size: .85rem; margin: .5rem 0; }
+    th, td { border: 1px solid #dde; padding: 4px 8px; text-align: left; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    th { background: #eef2f6; }
+    .tabla { overflow-x: auto; }
+    select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; background: #fff; }
+    .fila { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem 1rem; }
+    @media (max-width: 560px) { .fila { grid-template-columns: 1fr; } }
+    .sec { background: #fff; color: #1a5276; border: 1px solid #1a5276; margin-top: .5rem; width: auto; padding: 8px 14px; font-size: .9rem; }
+  </style>
+  <link rel="icon" href="/inventariolab/public/app_icon">
+</head>
+<body>
+  <div class="card">
+    <h1>¿Qué es cada columna?</h1>
+    <p>Planilla elegida: <strong><%= titulo || 'sin título' %></strong>. Se copian hasta <%= maxFilas %> artículos a un laboratorio nuevo; la original queda como está. Las fotos no se copian: se agregan después desde la aplicación.</p>
+    <% if (error) { %><div class="error"><%= error %></div><% } %>
+
+    <form method="get" action="/inventariolab/importar/mapear">
+      <div class="fila">
+        <div>
+          <label for="hoja">Hoja</label>
+          <select id="hoja" name="hoja">
+            <% hojas.forEach(function (h, k) { %><option value="<%= k %>" <%= k === hoja ? 'selected' : '' %>><%= h.nombre %></option><% }) %>
+          </select>
+        </div>
+        <div>
+          <label for="enc">Fila de los títulos de columna</label>
+          <input id="enc" name="enc" type="number" min="1" max="1000" value="<%= filaEnc %>">
+        </div>
+      </div>
+      <button type="submit" class="sec">Actualizar la vista</button>
+    </form>
+
+    <label>Así se ve (primeras filas)</label>
+    <div class="tabla">
+      <table>
+        <tr><% for (var c = 0; c < columnas; c++) { %><th><%= letra(c) %>: <%= encabezados[c] || '' %></th><% } %></tr>
+        <% vista.forEach(function (f) { %><tr><% for (var c = 0; c < columnas; c++) { %><td><%= f[c] || '' %></td><% } %></tr><% }) %>
+      </table>
+    </div>
+    <p style="font-size:.85rem">Hay <%= totalFilas %> filas debajo de los títulos.</p>
+
+    <form method="post" action="/inventariolab/importar/crear">
+      <input type="hidden" name="hoja" value="<%= hoja %>">
+      <input type="hidden" name="enc" value="<%= filaEnc %>">
+      <%
+        var campos = [
+          ['articulo', 'Nombre del artículo (obligatorio)'],
+          ['bien', 'Cantidad en buen estado'],
+          ['regular', 'Cantidad en estado regular'],
+          ['roto', 'Cantidad rota'],
+          ['ubicacion', 'Armario o ubicación'],
+          ['cod', 'Código interno'],
+          ['obs', 'Observaciones']
+        ];
+      %>
+      <div class="fila">
+      <% campos.forEach(function (campo) { %>
+        <div>
+          <label for="c-<%= campo[0] %>"><%= campo[1] %></label>
+          <select id="c-<%= campo[0] %>" name="<%= campo[0] %>">
+            <option value="">— no usar —</option>
+            <% for (var c = 0; c < columnas; c++) { %><option value="<%= c %>" <%= String(mapeo[campo[0]]) === String(c) ? 'selected' : '' %>><%= letra(c) %><%= encabezados[c] ? ': ' + encabezados[c] : '' %></option><% } %>
+          </select>
+        </div>
+      <% }) %>
+      </div>
+      <div class="nota">
+        Si no elegís columnas de cantidad, cada fila cuenta como 1 unidad en buen estado. Las ubicaciones distintas que haya se crean como armarios (zonas) del laboratorio nuevo.
+      </div>
+      <button type="submit">Crear el laboratorio con estos datos</button>
+    </form>
+    <p style="margin-top:1.5rem;font-size:.85rem;"><a href="/inventariolab/importar/elegir">← Elegir otra planilla</a></p>
+  </div>
+</body>
+</html>

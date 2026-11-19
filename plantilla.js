@@ -56,7 +56,7 @@ function valoresIniciales({ institucion, laboratorio, adminEmail }) {
 /**
  * Crea la planilla y la carpeta de fotos con las credenciales que se pasan
  * (el Drive de quien la crea) y deja a `adminEmail` como ADMIN.
- * Devuelve { sheetId, carpetaId, url }.
+ * Devuelve { sheetId, carpetaId, hojaInventarioId, url }.
  */
 async function crearLaboratorio({ sheets, drive, institucion, laboratorio, adminEmail }) {
   institucion = limpiarNombre(institucion);
@@ -91,7 +91,7 @@ async function crearLaboratorio({ sheets, drive, institucion, laboratorio, admin
     fields: 'id',
   });
 
-  return { sheetId, carpetaId: carpeta.data.id, url: `https://docs.google.com/spreadsheets/d/${sheetId}` };
+  return { sheetId, carpetaId: carpeta.data.id, hojaInventarioId: idHoja('INVENTARIO'), url: `https://docs.google.com/spreadsheets/d/${sheetId}` };
 }
 
 module.exports = {

@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const driveUsuario = require('./driveUsuario');
 const plantilla = require('./plantilla');
 const antibots = require('./antibots');
+const importar = require('./importar');
 const exportar = require('./exportar');
 const avisos = require('./avisos');
 const { crearBuscadorFoto, crearLimitador, ErrorBusquedaFoto } = require('./busquedaFoto');
@@ -234,6 +235,7 @@ router.get('/lab/:labId', async (req, res) => {
     labId,
     driveAutorizado: driveUsuario.estado(labId).autorizado,
     driveMsg: req.query.creado === '1' ? 'creado' : String(req.query.drive || ''),
+    importados: req.query.creado === '1' ? Math.min(parseInt(req.query.importados, 10) || 0, 100000) : 0,
     avisoMedicion: permisos.esAdmin && registroBusquedas.listoParaVerificar() ? { cantidad: registroBusquedas.cantidad() } : null
   });
 });
@@ -269,21 +271,25 @@ const limitarCreacionPorIp = crearLimitador(LIMITES_CREAR.porIpHora, 60 * 60 * 1
 const SECRETO_FORMULARIO = SESSION_SECRET || 'solo-desarrollo';
 const turnstile = { clave: process.env.TURNSTILE_SITE_KEY || '', secreto: process.env.TURNSTILE_SECRET_KEY || '' };
 
-router.get('/crear', (req, res) => {
+const paginaCrear = modo => (req, res) => {
   const cerrado = antibots.motivoDeLimite(driveUsuario.laboratoriosPropios(), LIMITES_CREAR);
   res.render('crear', {
+    modo,
     error: MENSAJES_CREAR[req.query.error] || (cerrado === 'limite-total' || cerrado === 'limite-dia' ? MENSAJES_CREAR[cerrado] : ''),
     configurado: !!process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_ID !== 'test' && !(cerrado === 'limite-total' || cerrado === 'limite-dia'),
     token: antibots.emitirToken(SECRETO_FORMULARIO),
     turnstileClave: turnstile.clave,
   });
-});
+};
+router.get('/crear', paginaCrear('crear'));
+router.get('/importar', paginaCrear('importar'));
 
-router.post('/crear', async (req, res) => {
+router.post(['/crear', '/importar'], async (req, res) => {
   if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID === 'test') {
     return res.status(500).send('Google OAuth no está configurado (falta el Client ID).');
   }
-  const volver = codigo => res.redirect(`/inventariolab/crear?error=${codigo}`);
+  const esImportacion = req.body.modo === 'importar';
+  const volver = codigo => res.redirect(`/inventariolab/${esImportacion ? 'importar' : 'crear'}?error=${codigo}`);
   // formulario genuino: token firmado y no demasiado rápido, y el campo trampa vacío
   if (req.body.sitio_web || antibots.validarToken(req.body.token, SECRETO_FORMULARIO, { minMs: LIMITES_CREAR.minMs }) !== 'ok') return volver('formulario');
   if (!limitarCreacionPorIp(req.ip)) return volver('demasiados');
@@ -296,7 +302,7 @@ router.post('/crear', async (req, res) => {
   if (!institucion || !laboratorio) return volver('nombres');
 
   const state = crypto.randomBytes(24).toString('hex');
-  req.session.crearLab = { state, institucion, laboratorio };
+  req.session.crearLab = { state, institucion, laboratorio, importar: esImportacion };
   req.session.save(err => {
     if (err) return res.status(500).send('No se pudo iniciar la creación.');
     res.redirect(driveUsuario.urlAutorizacion(state, undefined, { conIdentidad: true }));
@@ -305,14 +311,23 @@ router.post('/crear', async (req, res) => {
 
 async function finalizarCreacion(req, res, pedido) {
   delete req.session.crearLab;
-  if (req.query.error || !req.query.code) return res.redirect('/inventariolab/crear?error=cancelado');
+  const pagina = pedido.importar ? 'importar' : 'crear';
+  if (req.query.error || !req.query.code) return res.redirect(`/inventariolab/${pagina}?error=cancelado`);
   try {
     const cuenta = await driveUsuario.identificarYConectar(req.query.code);
     // el tope por correo solo se puede comprobar ahora, que Google ya dijo quién es
     const cerrado = antibots.motivoDeLimite(driveUsuario.laboratoriosPropios(), LIMITES_CREAR, { email: cuenta.email });
     if (cerrado) {
       console.warn(`[crear] rechazado (${cerrado}): ${cuenta.email}`);
-      return res.redirect(`/inventariolab/crear?error=${cerrado}`);
+      return res.redirect(`/inventariolab/${pagina}?error=${cerrado}`);
+    }
+    // importar: antes de crear nada hay que elegir la planilla con el selector de Google
+    if (pedido.importar) {
+      req.session.importacion = guardarImportacion({ cuenta, institucion: pedido.institucion, laboratorio: pedido.laboratorio });
+      return req.session.save(err => {
+        if (err) throw err;
+        res.redirect('/inventariolab/importar/elegir');
+      });
     }
     const { sheetId } = await plantilla.crearLaboratorio({
       sheets: cuenta.sheets, drive: cuenta.drive,
@@ -330,9 +345,120 @@ async function finalizarCreacion(req, res, pedido) {
     });
   } catch (err) {
     console.error('[crear]', err.message);
-    res.redirect('/inventariolab/crear?error=fallo');
+    res.redirect(`/inventariolab/${pagina}?error=fallo`);
   }
 }
+
+// ─── IMPORTAR UNA PLANILLA EXISTENTE ──────────────────
+// Mismo ingreso que "Crear mi laboratorio" (Google + topes + anti-bots). Después:
+// 1) selector de archivos de Google (la persona elige SU planilla; la app solo
+//    ve esa), 2) elegir hoja y qué columna es cada cosa, 3) la app crea una
+// planilla nueva con la plantilla y copia los datos. La original no se toca.
+// Mientras se elige, las credenciales viven en memoria (no en disco ni en la sesión).
+const importaciones = new Map();
+const VIDA_IMPORTACION_MS = 30 * 60 * 1000;
+const MAX_IMPORTACIONES = 100;
+
+function guardarImportacion(datos) {
+  const ahora = Date.now();
+  for (const [id, i] of importaciones) if (ahora - i.creada > VIDA_IMPORTACION_MS) importaciones.delete(id);
+  while (importaciones.size >= MAX_IMPORTACIONES) importaciones.delete(importaciones.keys().next().value);
+  const id = crypto.randomBytes(24).toString('hex');
+  importaciones.set(id, { ...datos, creada: ahora, origen: null });
+  return id;
+}
+function importacionDe(req) {
+  const i = importaciones.get(req.session.importacion);
+  if (!i || Date.now() - i.creada > VIDA_IMPORTACION_MS) { importaciones.delete(req.session.importacion); return null; }
+  return i;
+}
+const sinImportacion = res => res.redirect('/inventariolab/importar?error=vencido');
+MENSAJES_CREAR.vencido = 'Pasó demasiado tiempo y la importación venció. Empezá de nuevo.';
+MENSAJES_CREAR.planilla = 'No se pudo leer esa planilla. Elegila de nuevo.';
+
+router.get('/importar/elegir', (req, res) => {
+  const i = importacionDe(req);
+  if (!i) return sinImportacion(res);
+  res.setHeader('Cache-Control', 'no-store');
+  res.render('importar-elegir', {
+    accessToken: i.cuenta.accessToken || '',
+    appId: (process.env.GOOGLE_CLIENT_ID || '').split('-')[0],
+    error: MENSAJES_CREAR[req.query.error] || '',
+  });
+});
+
+router.post('/importar/origen', async (req, res) => {
+  const i = importacionDe(req);
+  if (!i) return sinImportacion(res);
+  try {
+    i.origen = await importar.leerOrigen(i.cuenta.sheets, String(req.body.fileId || ''));
+    res.redirect('/inventariolab/importar/mapear');
+  } catch (err) {
+    console.warn('[importar] origen:', err.message);
+    res.redirect('/inventariolab/importar/elegir?error=planilla');
+  }
+});
+
+router.get('/importar/mapear', (req, res) => {
+  const i = importacionDe(req);
+  if (!i) return sinImportacion(res);
+  if (!i.origen) return res.redirect('/inventariolab/importar/elegir');
+  const hojas = i.origen.hojas;
+  const hoja = Math.min(Math.max(parseInt(req.query.hoja, 10) || 0, 0), hojas.length - 1);
+  const filas = hojas[hoja].filas;
+  const filaEnc = Math.min(Math.max(parseInt(req.query.enc, 10) || importar.adivinarFilaEncabezados(filas), 1), Math.max(filas.length, 1));
+  const encabezados = filas[filaEnc - 1] || [];
+  const columnas = Math.max(encabezados.length, ...filas.slice(filaEnc, filaEnc + importar.VISTA_PREVIA).map(f => f.length), 1);
+  res.setHeader('Cache-Control', 'no-store');
+  res.render('importar-mapear', {
+    titulo: i.origen.titulo, hojas, hoja, filaEnc, columnas, encabezados,
+    vista: filas.slice(filaEnc, filaEnc + importar.VISTA_PREVIA),
+    totalFilas: Math.max(filas.length - filaEnc, 0),
+    mapeo: importar.adivinarColumnas(encabezados),
+    letra: importar.letraDe, maxFilas: importar.MAX_FILAS,
+    error: req.query.error === 'articulo' ? 'Elegí qué columna tiene el nombre del artículo.' : req.query.error === 'vacia' ? 'No se encontró ningún artículo con esa elección. Revisá la fila de encabezados y la columna del artículo.' : '',
+  });
+});
+
+router.post('/importar/crear', async (req, res) => {
+  const i = importacionDe(req);
+  if (!i || !i.origen) return sinImportacion(res);
+  const hoja = i.origen.hojas[parseInt(req.body.hoja, 10)];
+  const filaEnc = parseInt(req.body.enc, 10);
+  const volver = codigo => res.redirect(`/inventariolab/importar/mapear?hoja=${parseInt(req.body.hoja, 10) || 0}&enc=${filaEnc || 1}&error=${codigo}`);
+  if (!hoja || !(filaEnc >= 1)) return volver('articulo');
+  const mapeo = {};
+  for (const campo of ['articulo', 'cod', 'bien', 'regular', 'roto', 'obs', 'ubicacion']) {
+    const v = String(req.body[campo] == null ? '' : req.body[campo]);
+    mapeo[campo] = /^\d{1,2}$/.test(v) ? Number(v) : '';
+  }
+  let convertido;
+  try { convertido = importar.convertir({ filas: hoja.filas, filaEncabezados: filaEnc, mapeo }); }
+  catch (err) { return volver('articulo'); }
+  if (!convertido.importadas) return volver('vacia');
+
+  importaciones.delete(req.session.importacion); // un solo intento: no se crean dos laboratorios con la misma elección
+  delete req.session.importacion;
+  try {
+    const { cuenta } = i;
+    const { sheetId, hojaInventarioId } = await plantilla.crearLaboratorio({
+      sheets: cuenta.sheets, drive: cuenta.drive, institucion: i.institucion, laboratorio: i.laboratorio, adminEmail: cuenta.email,
+    });
+    driveUsuario.guardarToken(sheetId, cuenta.refreshToken, cuenta.email, { modo: 'usuario' });
+    await importar.copiarDatos({ sheets: cuenta.sheets, sheetId, idHojaInventario: hojaInventarioId, convertido });
+    console.log(`[importar] laboratorio ${sheetId} creado por ${cuenta.email} con ${convertido.importadas} artículos`);
+    avisos.avisarCreacion({ email: cuenta.email, institucion: i.institucion, laboratorio: i.laboratorio, labId: sheetId, total: driveUsuario.laboratoriosPropios().length });
+    req.session.email = cuenta.email;
+    req.session.labId = sheetId;
+    req.session.save(err => {
+      if (err) console.error('[importar] sesión:', err.message);
+      res.redirect(`/inventariolab/lab/${encodeURIComponent(sheetId)}?creado=1&importados=${convertido.importadas}`);
+    });
+  } catch (err) {
+    console.error('[importar]', err.message);
+    res.redirect('/inventariolab/importar?error=fallo');
+  }
+});
 
 // ─── AUTORIZAR DRIVE (para guardar fotos) ───────────
 // La cuenta de servicio no puede ser dueña de archivos en Drive (no tiene

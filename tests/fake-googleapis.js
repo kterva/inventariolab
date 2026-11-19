@@ -61,7 +61,8 @@ function colANum(letras) { let n = 0; for (const c of letras.toUpperCase()) n = 
 
 /** 'Hoja!A3:N' -> { hoja, f0, c0, f1, c1 } (índices 0, extremos incluidos; Infinity = abierto) */
 function parsear(rango) {
-  const [hoja, ref] = rango.includes('!') ? rango.split('!') : [rango, ''];
+  let [hoja, ref] = rango.includes('!') ? rango.split('!') : [rango, ''];
+  if (/^'.*'$/.test(hoja)) hoja = hoja.slice(1, -1).replace(/''/g, "'"); // nombre de hoja entre comillas
   if (!ref) return { hoja, f0: 0, c0: 0, f1: Infinity, c1: Infinity };
   const punto = p => { const m = /^([A-Z]*)(\d*)$/i.exec(p); return { c: m[1] ? colANum(m[1]) : null, f: m[2] ? Number(m[2]) - 1 : null }; };
   const [a, b = a] = ref.split(':');
