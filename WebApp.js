@@ -180,7 +180,7 @@ function buildAccessDeniedHtml(email) {
 // versión de Apps Script solo redirige: los QR impresos apuntan acá y tienen
 // que seguir funcionando, pero toda escritura pasa por la app nueva (IDs fijos
 // e historial en la hoja HISTORIAL).
-var URL_APP_NUEVA = "https://culturalibre.edu.uy/inventariolab";
+var URL_APP_NUEVA = "https://culturalibre.uy/inventariolab";
 
 function doGet(e) {
   var zona = ((e && e.parameter && e.parameter.zona) || "").trim();

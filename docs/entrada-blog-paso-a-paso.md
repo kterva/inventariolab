@@ -8,7 +8,7 @@ https://leonardotrujillo.uy/soberania-tecnologica-en-el-laboratorio-sistema-de-i
 
 Antes había que copiar una planilla, publicar un script de Google Apps Script y aceptar una advertencia de seguridad. **Ya no hace falta nada de eso**: la propia aplicación crea todo en tu Google Drive.
 
-1. **Entrá a [culturalibre.edu.uy/inventariolab](https://culturalibre.edu.uy/inventariolab)** y tocá **«✨ Crear mi laboratorio»**.
+1. **Entrá a [culturalibre.uy/inventariolab](https://culturalibre.uy/inventariolab)** y tocá **«✨ Crear mi laboratorio»**.
 2. **Escribí el nombre de tu centro y el del laboratorio** (por ejemplo, «Liceo Sauce 2» y «Laboratorio de Física») y tocá **Continuar con Google**.
 3. **Elegí tu cuenta de Google y aceptá los permisos.** Google te dice que Inventario Laboratorio quiere ver tu correo (para dejarte como administrador) y crear y usar **solo los archivos que crea la propia aplicación**: tu planilla y la carpeta de fotos. No puede ver el resto de tu Drive, y podés quitar el permiso cuando quieras en [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
 4. **Listo.** En tu Drive aparecen la planilla del inventario y la carpeta de fotos, y entrás al panel como administrador.
@@ -23,8 +23,8 @@ Antes había que copiar una planilla, publicar un script de Google Apps Script y
   Quien no esté en `config` ve «acceso denegado».
 - **Dentro de la aplicación:** creá tus armarios en «Impresión de QRs y Gestión de Zonas», cargá los materiales en la pestaña `INVENTARIO` de tu planilla (indicando el armario en la columna «Ubicación») e imprimí los QR para pegarlos en las puertas.
 - **Si ya tenés tu inventario en otra planilla**, tocá **«📥 Importar mi planilla»** en la pantalla principal: elegís tu planilla con el selector de Google, indicás qué columna es cada cosa y la aplicación copia los datos a un laboratorio nuevo. **Tu planilla original no se modifica.** Las fotos no se copian.
-- **Si usabas la versión anterior**, tu laboratorio sigue funcionando igual, y los QR que ya imprimiste también. El método viejo (compartir la planilla con el correo del servidor) está en la [ayuda](https://culturalibre.edu.uy/inventariolab/ayuda), en «alternativa».
-- **Privacidad:** el servidor no guarda una base de datos con tus datos: el inventario vive en tu planilla. Quien administra el servidor recibe un aviso con tu correo cuando creás un laboratorio. Más detalles en la [política de privacidad](https://culturalibre.edu.uy/inventariolab/privacidad).
+- **Si usabas la versión anterior**, tu laboratorio sigue funcionando igual, y los QR que ya imprimiste también. El método viejo (compartir la planilla con el correo del servidor) está en la [ayuda](https://culturalibre.uy/inventariolab/ayuda), en «alternativa».
+- **Privacidad:** el servidor no guarda una base de datos con tus datos: el inventario vive en tu planilla. Quien administra el servidor recibe un aviso con tu correo cuando creás un laboratorio. Más detalles en la [política de privacidad](https://culturalibre.uy/inventariolab/privacidad).
 
 ### Código fuente
 

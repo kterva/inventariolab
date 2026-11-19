@@ -2,7 +2,7 @@
 
 Gestor de inventario de código abierto para los laboratorios de Educación Media de Uruguay y Latinoamérica. Cada centro usa **su propia planilla de Google Sheets** como base de datos, y la aplicación agrega búsqueda, vista por armario con códigos QR, fotos, reportes de incidencias e historial de cambios.
 
-Instancia pública: <https://culturalibre.edu.uy/inventariolab> · [Política de privacidad](https://culturalibre.edu.uy/inventariolab/privacidad)
+Instancia pública: <https://culturalibre.uy/inventariolab> · [Política de privacidad](https://culturalibre.uy/inventariolab/privacidad)
 
 ## Cómo funciona
 
