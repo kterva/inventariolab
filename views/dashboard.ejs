@@ -105,7 +105,7 @@
       <h3>💾 Exportar mis datos</h3>
       <p>Llevate tu laboratorio cuando quieras: la planilla completa y todas las fotos.</p>
       <p style="margin-top:10px;">
-        <a class="btn-export" href="/inventariolab/lab/<%= encodeURIComponent(labId) %>/exportar/planilla.xlsx">📊 Planilla (.xlsx)</a>
+        <a class="btn-export" href="/inventariolab/lab/<%= encodeURIComponent(labId) %>/exportar/planilla.ods">📊 Planilla (.ods)</a>
         <a class="btn-export" href="/inventariolab/lab/<%= encodeURIComponent(labId) %>/exportar/fotos.zip">🖼️ Fotos (.zip)</a>
       </p>
       <p style="font-size:.8rem;opacity:.75;">La planilla y las fotos ya están en tu Google Drive; esto te da una copia en tu computadora. El ZIP puede tardar si hay muchas fotos.</p>
@@ -460,6 +460,9 @@
     }
   }
 
+  const SIN_UBICACION = '__SIN_UBICACION__';
+  let faltanFotos = [];
+
   async function loadNoPhoto() {
     showView('nophoto');
     const div = document.getElementById('noPhotoResults');
@@ -470,30 +473,65 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error de servidor');
       
-      const faltan = data.filter(item => !item.foto || item.foto.trim() === '');
+      faltanFotos = data.filter(item => !item.foto || item.foto.trim() === '');
       
-      if (faltan.length === 0) {
+      if (faltanFotos.length === 0) {
         div.innerHTML = '<div class="loader">¡Excelente! Todos los materiales tienen foto.</div>';
         return;
       }
-      
-      let htmlStr = `<div style="margin-bottom:15px; font-weight:bold; color:#e74c3c;">Faltan ${faltan.length} fotos en total.</div>`;
-      faltan.forEach(function(item) {
-        const ubi = item.ubicacion ? item.ubicacion.toString().trim() : "";
-        const link = ubi ? WEB_APP_URL + "?zona=" + encodeURIComponent(ubi) + "#item-" + encodeURIComponent(item.id || "fila" + item.fila) : null;
-        const clickAttr = link ? `data-href="${esc(link)}" onclick="abrirConCarga(this.dataset.href)"` : '';
-        const styleAttr = link ? 'style="cursor:pointer;" title="Ir al armario para tomar la foto"' : '';
-        const icon = link ? ' <span style="background:#1a5276; color:white; padding:2px 6px; border-radius:4px; font-size:0.75em; margin-left:5px;">📸 Ir a sacar foto</span>' : '';
-        
-        htmlStr += '<div class="result-item" ' + clickAttr + ' ' + styleAttr + '>' +
-          '<strong>' + esc(item.articulo) + '</strong><br>' +
-          '<small>📍 ' + esc(ubi || 'Sin ubicación') + icon + '</small>' +
-          '</div>';
+
+      // armarios que tienen materiales sin foto, con su cantidad
+      const cuenta = {};
+      faltanFotos.forEach(item => {
+        const ubi = item.ubicacion ? item.ubicacion.toString().trim() : '';
+        cuenta[ubi] = (cuenta[ubi] || 0) + 1;
       });
-      div.innerHTML = htmlStr;
+      const nombres = Object.keys(cuenta).filter(n => n !== '').sort((x, y) => x.localeCompare(y, 'es'));
+      let opciones = `<option value="">Todos los armarios (${faltanFotos.length})</option>`;
+      nombres.forEach(n => { opciones += `<option value="${esc(n)}">${esc(n)} (${cuenta[n]})</option>`; });
+      if (cuenta['']) opciones += `<option value="${SIN_UBICACION}">Sin ubicación (${cuenta['']})</option>`;
+
+      div.innerHTML =
+        '<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">' +
+          '<label for="filtroArmarioFoto" style="font-weight:bold; color:#1a5276;">Armario:</label>' +
+          `<select id="filtroArmarioFoto" onchange="renderNoPhoto()" style="flex:1; min-width:180px; padding:8px; border:1px solid #ddd; border-radius:4px;">${opciones}</select>` +
+        '</div>' +
+        '<div id="noPhotoExport" style="margin-bottom:10px;"></div>' +
+        '<div id="noPhotoLista"></div>';
+      renderNoPhoto();
     } catch (err) {
       div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error: ' + esc(err.message) + '</div>';
     }
+  }
+
+  // Muestra la lista del armario elegido y arma los enlaces de exportación con el mismo filtro
+  function renderNoPhoto() {
+    const zona = document.getElementById('filtroArmarioFoto').value;
+    const ubiDe = item => item.ubicacion ? item.ubicacion.toString().trim() : '';
+    const faltan = faltanFotos.filter(item => zona === '' ? true : (zona === SIN_UBICACION ? ubiDe(item) === '' : ubiDe(item) === zona));
+
+    const q = zona === '' ? '' : '?zona=' + encodeURIComponent(zona);
+    const base = `/inventariolab/lab/${encodeURIComponent(LAB_ID)}/exportar/sin-foto.`;
+    document.getElementById('noPhotoExport').innerHTML =
+      '<span style="font-size:0.85rem; color:#555; margin-right:6px;">Exportar esta lista:</span>' +
+      `<a class="btn-export" href="${esc(base + 'ods' + q)}">📊 ODS</a>` +
+      `<a class="btn-export" href="${esc(base + 'pdf' + q)}">📄 PDF</a>` +
+      `<a class="btn-export" href="${esc(base + 'csv' + q)}">🧾 CSV</a>`;
+
+    let htmlStr = `<div style="margin-bottom:15px; font-weight:bold; color:#e74c3c;">Faltan ${faltan.length} fotos${zona === '' ? ' en total' : ''}.</div>`;
+    faltan.forEach(function(item) {
+      const ubi = ubiDe(item);
+      const link = ubi ? WEB_APP_URL + "?zona=" + encodeURIComponent(ubi) + "#item-" + encodeURIComponent(item.id || "fila" + item.fila) : null;
+      const clickAttr = link ? `data-href="${esc(link)}" onclick="abrirConCarga(this.dataset.href)"` : '';
+      const styleAttr = link ? 'style="cursor:pointer;" title="Ir al armario para tomar la foto"' : '';
+      const icon = link ? ' <span style="background:#1a5276; color:white; padding:2px 6px; border-radius:4px; font-size:0.75em; margin-left:5px;">📸 Ir a sacar foto</span>' : '';
+      
+      htmlStr += '<div class="result-item" ' + clickAttr + ' ' + styleAttr + '>' +
+        '<strong>' + esc(item.articulo) + '</strong><br>' +
+        '<small>📍 ' + esc(ubi || 'Sin ubicación') + icon + '</small>' +
+        '</div>';
+    });
+    document.getElementById('noPhotoLista').innerHTML = htmlStr;
   }
 
   async function loadZones() {

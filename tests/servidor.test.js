@@ -393,7 +393,7 @@ test('crear mi laboratorio: topes por correo, por día y en total', async () => 
   } finally { await s.parar(); }
 });
 
-test('exportar: solo admins; la planilla sale como .xlsx y el ZIP de fotos es un ZIP válido', async () => {
+test('exportar: solo admins; la planilla sale como .ods (formato abierto) y el ZIP de fotos es un ZIP válido', async () => {
   const fotos = async (s, cookie, ruta) => {
     const r = await fetch(`${s.base}/exportar/${ruta}`, { redirect: 'manual', headers: { cookie } });
     return { status: r.status, tipo: r.headers.get('content-type'), disp: r.headers.get('content-disposition'), cuerpo: Buffer.from(await r.arrayBuffer()) };
@@ -402,7 +402,7 @@ test('exportar: solo admins; la planilla sale como .xlsx y el ZIP de fotos es un
   // sin sesión: no hay exportación
   let s = await arrancar({ MODO_DEMO: 'NO' });
   try {
-    for (const ruta of ['planilla.xlsx', 'fotos.zip']) assert.equal((await fetch(`${s.base}/exportar/${ruta}`)).status, 401);
+    for (const ruta of ['planilla.ods', 'fotos.zip']) assert.equal((await fetch(`${s.base}/exportar/${ruta}`)).status, 401);
   } finally { await s.parar(); }
 
   // un docente (LECTOR) o un visor no exportan ni ven la tarjeta
@@ -412,7 +412,7 @@ test('exportar: solo admins; la planilla sale como .xlsx y el ZIP de fotos es un
       const http = cliente();
       const panel = await http(s.base);
       assert.ok(!panel.texto.includes('Exportar mis datos'));
-      assert.equal((await fotos(s, panel.cookie(), 'planilla.xlsx')).status, 403);
+      assert.equal((await fotos(s, panel.cookie(), 'planilla.ods')).status, 403);
       assert.equal((await fotos(s, panel.cookie(), 'fotos.zip')).status, 403);
     } finally { await s.parar(); }
   }
@@ -424,14 +424,14 @@ test('exportar: solo admins; la planilla sale como .xlsx y el ZIP de fotos es un
     const abierto = await http(s.base);
     const panel = abierto.texto, cookie = abierto.cookie();
     assert.ok(panel.includes('Exportar mis datos'));
-    assert.ok(panel.includes('/exportar/planilla.xlsx') && panel.includes('/exportar/fotos.zip'));
+    assert.ok(panel.includes('/exportar/planilla.ods') && panel.includes('/exportar/fotos.zip'));
 
-    const xlsx = await fotos(s, cookie, 'planilla.xlsx');
-    assert.equal(xlsx.status, 200);
-    assert.equal(xlsx.tipo, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    assert.match(xlsx.disp, /^attachment; filename="[^"]*\.xlsx"; filename\*=UTF-8''/);
-    assert.ok(!/[\r\n]/.test(xlsx.disp));
-    assert.ok(xlsx.cuerpo.toString().startsWith('XLSX:LABTEST:'), 'es la exportación de ESTA planilla');
+    const ods = await fotos(s, cookie, 'planilla.ods');
+    assert.equal(ods.status, 200);
+    assert.equal(ods.tipo, 'application/vnd.oasis.opendocument.spreadsheet');
+    assert.match(ods.disp, /^attachment; filename="[^"]*\.ods"; filename\*=UTF-8''/);
+    assert.ok(!/[\r\n]/.test(ods.disp));
+    assert.ok(ods.cuerpo.toString().startsWith('EXPORT:LABTEST:'), 'es la exportación de ESTA planilla');
 
     const zip = await fotos(s, cookie, 'fotos.zip');
     assert.equal(zip.status, 200);
@@ -542,5 +542,56 @@ test('PDF de QR: solo admins; sale un PDF A4 con las zonas elegidas (una, alguna
     }
     assert.equal((await pedir(s, cookie, { listaIds: ['Z99'] })).status, 404, 'ninguna zona coincide');
     assert.equal((await pedir(s, cookie, { listaIds: 'Z01' })).status, 400, 'la lista debe ser un arreglo');
+  } finally { await s.parar(); }
+});
+
+test('materiales sin foto: solo admins; sale en ODS, CSV o PDF, de todos los armarios o de uno; la planilla vieja .xlsx redirige', async () => {
+  const pedir = (s, cookie, ruta) => fetch(`${s.base}/exportar/${ruta}`, { redirect: 'manual', headers: cookie ? { cookie } : {} });
+
+  let s = await arrancar({ MODO_DEMO: 'NO' });
+  try { assert.equal((await pedir(s, '', 'sin-foto.csv')).status, 401); } finally { await s.parar(); }
+
+  s = await arrancar({ MODO_DEMO: 'SI', DEMO_ROL: 'LECTOR' });
+  try {
+    const cookie = (await cliente()(s.base)).cookie();
+    assert.equal((await pedir(s, cookie, 'sin-foto.csv')).status, 403);
+  } finally { await s.parar(); }
+
+  s = await arrancar({ MODO_DEMO: 'SI', DEMO_ROL: 'ADMIN' });
+  try {
+    const abierto = await cliente()(s.base);
+    const cookie = abierto.cookie();
+    assert.ok(abierto.texto.includes('planilla.ods') && !abierto.texto.includes('planilla.xlsx'), 'el panel ofrece la planilla en .ods');
+
+    // la planilla simulada tiene 3 artículos sin foto: 2 en Z1 y 1 en Z2
+    const todos = await pedir(s, cookie, 'sin-foto.csv');
+    assert.equal(todos.status, 200);
+    assert.match(todos.headers.get('content-type'), /^text\/csv/);
+    assert.match(todos.headers.get('content-disposition'), /^attachment; filename="[^"]*\.csv"/);
+    const csvTodos = (await todos.text()).trim().split('\r\n');
+    assert.equal(csvTodos.length, 4, 'encabezado + 3 materiales');
+    assert.ok(csvTodos[0].endsWith('Artículo,Armario,ID'));
+
+    const z1 = (await (await pedir(s, cookie, 'sin-foto.csv?zona=Z1')).text()).trim().split('\r\n');
+    assert.equal(z1.length, 3, 'encabezado + 2 materiales de Z1');
+    assert.ok(z1.slice(1).every(l => l.includes(',Z1,')));
+    assert.equal((await (await pedir(s, cookie, 'sin-foto.csv?zona=Nada')).text()).trim().split('\r\n').length, 1, 'armario sin materiales: solo encabezado');
+
+    const ods = await pedir(s, cookie, 'sin-foto.ods?zona=Z2');
+    assert.equal(ods.status, 200);
+    assert.equal(ods.headers.get('content-type'), 'application/vnd.oasis.opendocument.spreadsheet');
+    const bodyOds = Buffer.from(await ods.arrayBuffer());
+    assert.equal(bodyOds.readUInt32LE(0), 0x04034b50, 'empieza como un ZIP');
+    assert.ok(bodyOds.includes(Buffer.from('mimetype')));
+
+    const pdf = await pedir(s, cookie, 'sin-foto.pdf');
+    assert.equal(pdf.status, 200);
+    assert.equal(pdf.headers.get('content-type'), 'application/pdf');
+    assert.equal(Buffer.from(await pdf.arrayBuffer()).subarray(0, 5).toString(), '%PDF-');
+
+    assert.equal((await pedir(s, cookie, 'sin-foto.xlsx')).status, 404, 'solo formatos abiertos');
+    const vieja = await pedir(s, cookie, 'planilla.xlsx');
+    assert.equal(vieja.status, 301);
+    assert.match(vieja.headers.get('location'), /\/exportar\/planilla\.ods$/);
   } finally { await s.parar(); }
 });

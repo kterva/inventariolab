@@ -1,4 +1,4 @@
-// Exportar: nombres de archivo seguros, ZIP de fotos en streaming y planilla .xlsx.
+// Exportar: nombres de archivo seguros, ZIP de fotos en streaming y planilla .ods.
 process.env.GOOGLE_SERVICE_ACCOUNT_JSON = '{}';
 process.env.SHEETS_CACHE_TTL_MS = '50';
 process.env.GOOGLE_BACKOFF_MS = '1';
@@ -136,13 +136,13 @@ test('el ZIP no acumula en memoria: espera a que el destino reciba cada foto', a
 });
 
 test('la planilla se exporta con el permiso del laboratorio; si es demasiado grande se explica qué hacer', async () => {
-  const stream = await gc.abrirExportacionXlsx('LAB-X');
+  const stream = await gc.abrirExportacionOds('LAB-X');
   const trozos = []; for await (const t of stream) trozos.push(t);
-  assert.equal(Buffer.concat(trozos).toString(), `XLSX:LAB-X:${ex.MIME_XLSX}`);
+  assert.equal(Buffer.concat(trozos).toString(), `EXPORT:LAB-X:${ex.MIME_ODS}`);
   m.exportFalla = 'grande';
   try {
     const silenciar = console.error; console.error = () => {};
-    try { await assert.rejects(gc.abrirExportacionXlsx('LAB-X'), e => e.codigo === 'PLANILLA_GRANDE' && /Archivo → Descargar/.test(e.message)); }
+    try { await assert.rejects(gc.abrirExportacionOds('LAB-X'), e => e.codigo === 'PLANILLA_GRANDE' && /Archivo → Descargar/.test(e.message)); }
     finally { console.error = silenciar; }
   } finally { m.exportFalla = null; }
 });

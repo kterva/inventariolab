@@ -1,4 +1,4 @@
-// Exportar los datos de un laboratorio: la planilla (.xlsx) y un ZIP con las fotos.
+// Exportar los datos de un laboratorio: la planilla (.ods) y un ZIP con las fotos.
 //
 // La planilla sola no alcanza para llevarse todo, porque las fotos son enlaces
 // de Drive. El ZIP se arma en streaming (sin guardar nada en disco ni tener
@@ -6,7 +6,7 @@
 // siguiente. Las fotos se bajan por su enlace público, el mismo que muestra la app.
 const archiver = require('archiver');
 
-const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const MIME_ODS = 'application/vnd.oasis.opendocument.spreadsheet';
 const HOST_FOTO = 'lh3.googleusercontent.com';
 const MAX_FOTO_BYTES = 25 * 1024 * 1024;
 const MAX_ZIP_BYTES = 3 * 1024 * 1024 * 1024; // por debajo de los 4 GB que admite un ZIP sin ZIP64
@@ -70,7 +70,7 @@ const LEEME = [
   '- indice.csv  qué artículo es cada archivo, dónde está guardado y si alguna foto no se pudo bajar.',
   '',
   'Los datos (artículos, cantidades, historial) están en la planilla de Google Sheets;',
-  'se descarga aparte como .xlsx desde el mismo panel.',
+  'se descarga aparte como .ods (formato abierto, se abre con LibreOffice, Excel y Google Sheets) desde el mismo panel.',
 ].join('\r\n') + '\r\n';
 
 /**
@@ -139,4 +139,4 @@ async function armarZip({ articulos, salida, descargar = descargarOriginal, señ
   }
 }
 
-module.exports = { MIME_XLSX, nombreSeguro, idDeFoto, extensionDe, celdaCsv, descargarOriginal, armarZip, MAX_FOTOS };
+module.exports = { MIME_ODS, nombreSeguro, idDeFoto, extensionDe, celdaCsv, descargarOriginal, armarZip, MAX_FOTOS };

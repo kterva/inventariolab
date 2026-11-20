@@ -15,7 +15,7 @@ Antes había que copiar una planilla, publicar un script de Google Apps Script y
 
 ### Lo que conviene saber
 
-- **La planilla es tuya.** Se crea en tu Drive, con tu cuenta como dueña. Podés abrirla, compartirla o descargarla cuando quieras. Desde el panel, la tarjeta **«Exportar mis datos»** baja la planilla en Excel y un ZIP con todas las fotos.
+- **La planilla es tuya.** Se crea en tu Drive, con tu cuenta como dueña. Podés abrirla, compartirla o descargarla cuando quieras. Desde el panel, la tarjeta **«Exportar mis datos»** baja la planilla en formato abierto (.ods, que abren LibreOffice, Excel y Google Sheets) y un ZIP con todas las fotos.
 - **Tus colegas no necesitan acceso a tu Drive.** Entran con su cuenta de Google y la aplicación mira en la pestaña `config` de tu planilla qué puede hacer cada uno:
   - `ADMIN`: control total (armarios, QR, fotos).
   - vacío o `LECTOR`: busca materiales y reporta roturas.

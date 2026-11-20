@@ -17,7 +17,7 @@ Navegador ──► Cloudflare ──► nginx ──► Node.js/Express (PM2)
 ```
 
 - Cada laboratorio se identifica por el **ID de su planilla**: `/inventariolab/lab/<ID>`.
-- **Laboratorios propios (recomendado):** cada docente toca «Crear mi laboratorio» (o «Importar mi planilla») y la app crea la planilla y la carpeta de fotos en **su** Google Drive con el permiso `drive.file`; el refresh token queda en `drive-tokens/<ID>.json` (modo 600). «Exportar mis datos» baja la planilla en `.xlsx` y las fotos en un ZIP. Detalles y diseño en [`docs/laboratorios-propios.md`](docs/laboratorios-propios.md); guía para docentes en [`docs/guia-docentes.md`](docs/guia-docentes.md).
+- **Laboratorios propios (recomendado):** cada docente toca «Crear mi laboratorio» (o «Importar mi planilla») y la app crea la planilla y la carpeta de fotos en **su** Google Drive con el permiso `drive.file`; el refresh token queda en `drive-tokens/<ID>.json` (modo 600). «Exportar mis datos» baja la planilla en `.ods` (formato abierto) y las fotos en un ZIP. Detalles y diseño en [`docs/laboratorios-propios.md`](docs/laboratorios-propios.md); guía para docentes en [`docs/guia-docentes.md`](docs/guia-docentes.md).
 - **Laboratorios con cuenta de servicio (versión anterior, siguen funcionando):** la app accede a la planilla con una **cuenta de servicio** de Google. El liceo comparte su planilla con el email de esa cuenta como **Editor**; la portada y la pantalla de error muestran cuál es.
 - Los usuarios inician sesión con **Google OAuth** (solo nombre y email).
 - Las **fotos las sube un administrador con su propia cuenta** (OAuth, alcance `drive.file`), no la cuenta de servicio: las cuentas de servicio no tienen cuota de almacenamiento en Drive y Google no las deja ser dueñas de archivos. Un admin toca "Autorizar Drive" una vez en el panel; las fotos van a la carpeta `LAB_FOTOS (InventarioLab)` de su Drive.
@@ -127,11 +127,16 @@ Estas carpetas del servidor **se conservan entre despliegues** y no están en el
 | `driveUsuario.js` | Autorización de Drive con la cuenta de un admin (OAuth, alcance `drive.file`): con ella se suben las fotos. |
 | `busquedaFoto.js` | Búsqueda por foto: embeddings de imagen (DINOv2-small, local), índice por laboratorio, cola y límite por usuario. |
 | `qrPdf.js` | PDF A4 con las etiquetas QR de los armarios elegidos (8 por hoja), con QR vectoriales generados localmente. |
+| `listados.js` | Listados exportables en formatos abiertos (ODS, CSV y PDF), hoy para «Materiales sin foto». |
 | `views/*.ejs` | Vistas (portada, login, dashboard, armario, ayuda, privacidad). |
 | `public/` | PWA: manifest, service worker e íconos. |
 | `WebApp.js`, `Index.html`, `Gatillos.js`, `GenerarQR_PRO.js`, `Gestion_Incidencias.js`, `Recuperar_reportes.js`, `appsscript.json`, `.clasp.json` | **Versión 1.x (Google Apps Script)**, conservada como referencia; la app de Node no los usa. |
 
 ## Historia y evolución
+
+### Versión 2.4.0 (20 de noviembre de 2026)
+- **Formatos abiertos:** «Exportar mis datos» baja la planilla en **ODS** (OpenDocument) en lugar de `.xlsx`. El enlace viejo `planilla.xlsx` redirige al `.ods`. Si la planilla supera el límite de Google, el aviso sugiere Archivo → Descargar → OpenDocument. Regla del proyecto: las exportaciones salen siempre en formatos abiertos.
+- **Faltan Fotos:** filtro por armario (con la cantidad de materiales sin foto de cada uno, y «Sin ubicación») y exportación de la lista, de todos los armarios o del elegido, a **ODS**, **PDF** (A4, con numeración de páginas) o **CSV** (UTF-8). Se arman en el servidor, sin servicios externos (módulo `listados.js`).
 
 ### Versión 2.3.2 (20 de noviembre de 2026)
 - **Explorar por armarios:** al pasar el mouse sobre un armario el puntero pasa a manito y el renglón se resalta, como en el resto de las listas.
@@ -149,7 +154,7 @@ Estas carpetas del servidor **se conservan entre despliegues** y no están en el
 ### Versión 2.2 (18-19 de noviembre de 2026)
 - **Laboratorios propios:** el botón «Crear mi laboratorio» crea la planilla y la carpeta de fotos en el Drive del docente y lo deja como administrador. Cada laboratorio usa sus propias credenciales de Google (permiso de su dueño o cuenta de servicio) y la app avisa con claridad si el permiso se revoca.
 - **Importar una planilla existente:** selector de Google, elección de columnas y copia a un laboratorio nuevo, sin tocar la original.
-- **Exportar:** la planilla (`.xlsx`) y las fotos (ZIP).
+- **Exportar:** la planilla (ahora `.ods`, desde 2.4) y las fotos (ZIP).
 - **Protección contra bots** al crear laboratorios (token firmado, campo trampa, topes por IP, correo, día y total, Turnstile opcional) y aviso por correo al administrador.
 - **Registro anónimo de búsquedas por foto**, con aviso a los admins cuando hay casos suficientes para verificar el umbral.
 - La app pasa a llamarse **«Inventario Laboratorio»**; licencia GPL-3.0-or-later; README en inglés y guías para docentes y de instalación propia.
@@ -199,8 +204,6 @@ Desarrollada 100 % sobre Google Apps Script, que servía el HTML y usaba la plan
 - Cada laboratorio nuevo necesita que un administrador autorice Drive una vez. Las fotos quedan en el Drive de esa cuenta.
 - La búsqueda por foto solo reconoce artículos que ya tienen foto, y su acierto se midió con pocas fotos (8 de 10 entre los 3 primeros). Conviene volver a medir con más fotos.
 - La vista del armario muestra el último evento de `HISTORIAL`; las ediciones hechas a mano en la planilla siguen yendo a la columna J (si la planilla tiene el script de Apps Script) y solo se muestran cuando el artículo no tiene eventos en `HISTORIAL`.
-- **Materiales sin foto:** agregar filtro por armario y exportación a ODS o PDF.
-- **Exportaciones de planillas:** siempre en formatos abiertos: ODS, o CSV como alternativa; nunca XLS/XLSX.
 
 ## Licencia
 

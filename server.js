@@ -14,6 +14,7 @@ const antibots = require('./antibots');
 const importar = require('./importar');
 const exportar = require('./exportar');
 const qrPdf = require('./qrPdf');
+const listados = require('./listados');
 const avisos = require('./avisos');
 const { crearBuscadorFoto, crearLimitador, ErrorBusquedaFoto } = require('./busquedaFoto');
 const { crearRegistro } = require('./registroBusquedas');
@@ -588,7 +589,7 @@ const requireReportar = (req, res, next) => {
 };
 
 // ─── EXPORTAR (solo admins) ───────────────────────────
-// El laboratorio es del docente: puede llevarse la planilla (.xlsx) y las fotos
+// El laboratorio es del docente: puede llevarse la planilla (.ods) y las fotos
 // (ZIP) cuando quiera. Se limita a un ZIP por laboratorio a la vez y a 2 en todo
 // el servidor, porque bajar cientos de fotos ocupa red y memoria del VPS.
 const exportandoFotos = new Set();
@@ -625,19 +626,63 @@ router.post('/lab/:labId/api/qrs.pdf', apiAuth, requireAdmin, async (req, res) =
   }
 });
 
-router.get('/lab/:labId/exportar/planilla.xlsx', apiAuth, requireAdmin, async (req, res) => {
+router.get('/lab/:labId/exportar/planilla.ods', apiAuth, requireAdmin, async (req, res) => {
   try {
-    const stream = await googleClient.abrirExportacionXlsx(req.params.labId);
-    res.setHeader('Content-Type', exportar.MIME_XLSX);
-    res.setHeader('Content-Disposition', adjunto(`${req.appConfig.laboratorio} - ${req.appConfig.institucion}`, 'xlsx'));
+    const stream = await googleClient.abrirExportacionOds(req.params.labId);
+    res.setHeader('Content-Type', exportar.MIME_ODS);
+    res.setHeader('Content-Disposition', adjunto(`${req.appConfig.laboratorio} - ${req.appConfig.institucion}`, 'ods'));
     res.setHeader('Cache-Control', 'no-store');
-    stream.on('error', err => { console.error('[exportar xlsx]', err.message); res.destroy(err); });
+    stream.on('error', err => { console.error('[exportar ods]', err.message); res.destroy(err); });
     res.on('close', () => stream.destroy());
     stream.pipe(res);
   } catch (err) {
-    console.error('[exportar xlsx]', err.message);
+    console.error('[exportar ods]', err.message);
     const status = err.codigo === 'CONEXION_VENCIDA' ? 503 : err.codigo === 'PLANILLA_GRANDE' ? 413 : 502;
     res.status(status).json({ error: err.codigo ? err.message : 'No se pudo exportar la planilla. Probá de nuevo en unos minutos.' });
+  }
+});
+
+// Enlaces viejos de la planilla en .xlsx: ahora se exporta en formato abierto (.ods)
+router.get('/lab/:labId/exportar/planilla.xlsx', (req, res) => {
+  res.redirect(301, `/inventariolab/lab/${encodeURIComponent(req.params.labId)}/exportar/planilla.ods`);
+});
+
+// «Materiales sin foto» en formatos abiertos (ods, csv, pdf), de todos los armarios o de uno (?zona=)
+const FORMATOS_LISTADO = { ods: listados.MIME_ODS, csv: listados.MIME_CSV, pdf: 'application/pdf' };
+router.get('/lab/:labId/exportar/sin-foto.:formato', apiAuth, requireAdmin, async (req, res) => {
+  try {
+    const formato = req.params.formato;
+    if (!Object.hasOwn(FORMATOS_LISTADO, formato)) return res.status(404).json({ error: 'Formato no disponible. Usá ods, csv o pdf.' });
+    const zona = typeof req.query.zona === 'string' ? req.query.zona : undefined;
+    const todos = await googleClient.buscarEnInventario(req.params.labId, '');
+    const faltan = listados.sinFoto(todos, zona);
+    const filas = listados.filasSinFoto(faltan);
+    const nombreZona = zona === listados.SIN_UBICACION ? 'Sin ubicación' : (zona || '').trim();
+    const titulo = nombreZona ? `Materiales sin foto - ${nombreZona}` : 'Materiales sin foto';
+
+    let cuerpo;
+    if (formato === 'csv') {
+      cuerpo = Buffer.from(listados.generarCsv(listados.ENCABEZADOS_SIN_FOTO, filas), 'utf8');
+    } else {
+      const trozos = [];
+      const salida = new Writable({ write(c, _, cb) { trozos.push(c); cb(); } });
+      if (formato === 'ods') {
+        await listados.generarOds({ nombreHoja: 'Sin foto', encabezados: listados.ENCABEZADOS_SIN_FOTO, filas, salida });
+      } else {
+        await listados.generarPdfListado({
+          titulo, encabezados: listados.ENCABEZADOS_SIN_FOTO, filas, anchos: [0.55, 0.30, 0.15], salida,
+          subtitulo: `${req.appConfig.laboratorio} - ${req.appConfig.institucion}  ·  ${filas.length} ${filas.length === 1 ? 'material' : 'materiales'}`,
+        });
+      }
+      cuerpo = Buffer.concat(trozos);
+    }
+    res.setHeader('Content-Type', FORMATOS_LISTADO[formato]);
+    res.setHeader('Content-Disposition', adjunto(`${titulo} - ${req.appConfig.laboratorio}`, formato));
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(cuerpo);
+  } catch (err) {
+    console.error('[exportar sin-foto]', err.message);
+    res.status(500).json({ error: 'No se pudo armar el listado. Probá de nuevo.' });
   }
 });
 

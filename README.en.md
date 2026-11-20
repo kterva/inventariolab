@@ -19,7 +19,7 @@ Browser ──► Cloudflare ──► nginx ──► Node.js/Express (PM2)
 ```
 
 - Each laboratory is identified by **its spreadsheet ID**: `/inventariolab/lab/<ID>`.
-- **Own laboratories (recommended):** a teacher taps "Crear mi laboratorio" (create my lab) or "Importar mi planilla" (import my spreadsheet), and the app creates the spreadsheet and the photo folder in **their** Google Drive using the narrow `drive.file` scope. "Exportar mis datos" downloads the spreadsheet as `.xlsx` and the photos as a ZIP, so teachers keep ownership of their data. Design notes: [`docs/laboratorios-propios.md`](docs/laboratorios-propios.md).
+- **Own laboratories (recommended):** a teacher taps "Crear mi laboratorio" (create my lab) or "Importar mi planilla" (import my spreadsheet), and the app creates the spreadsheet and the photo folder in **their** Google Drive using the narrow `drive.file` scope. "Exportar mis datos" downloads the spreadsheet as `.ods` (an open format) and the photos as a ZIP, so teachers keep ownership of their data. Design notes: [`docs/laboratorios-propios.md`](docs/laboratorios-propios.md).
 - **Service-account laboratories (earlier version, still working):** the school shares its spreadsheet with a Google service account as *Editor*.
 - Users sign in with **Google OAuth** (name and email only).
 - **Photo search** runs on the server itself, with no external services: it compares a photo against the items' photos using image embeddings (DINOv2-small, quantised, via `@huggingface/transformers`). It only recognises items that already have a photo.

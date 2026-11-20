@@ -40,7 +40,7 @@ Por otro lado, la foto que alguien saca **para buscar** un material se analiza e
 **Sí.** La planilla es una planilla de Google común y sigue siendo tuya si dejas de usar la aplicación, si el servicio cambia o si desaparece:
 
 - Todos tus datos están ahí: materiales, cantidades, armarios, historial y usuarios.
-- Puedes abrirla, editarla y descargarla como Excel (**Archivo → Descargar**).
+- Puedes abrirla, editarla y descargarla como ODS o Excel (**Archivo → Descargar**).
 - Las fotos siguen en tu Drive, y los enlaces de la planilla siguen abriéndolas.
 - Lo único que deja de funcionar sin la aplicación son las funciones que dependen de ella: la búsqueda, los reportes desde el celular y los **códigos QR**, que abren una dirección de la aplicación.
 
@@ -115,8 +115,8 @@ Se agregan en la hoja **config** de la planilla, columnas A y B:
 
 ### 6. Llevarte tus datos
 
-- **La planilla:** ábrela en tu Drive. Descárgala como Excel con **Archivo → Descargar**.
-- **Desde el panel (solo administradores):** en la tarjeta **Exportar mis datos**, toca **Planilla (.xlsx)** para bajarla en Excel y **Fotos (.zip)** para bajar todas las fotos. El ZIP trae además un `indice.csv` que dice qué artículo es cada foto. Si hay muchas fotos puede tardar un poco; dejá la pestaña abierta.
+- **La planilla:** ábrela en tu Drive. Descárgala con **Archivo → Descargar**.
+- **Desde el panel (solo administradores):** en la tarjeta **Exportar mis datos**, toca **Planilla (.ods)** para bajarla en formato abierto (se abre con LibreOffice, Excel y Google Sheets) y **Fotos (.zip)** para bajar todas las fotos. El ZIP trae además un `indice.csv` que dice qué artículo es cada foto. Si hay muchas fotos puede tardar un poco; dejá la pestaña abierta.
   > *Qué pasa:* la app te prepara una copia en tu computadora. No borra nada ni cambia tu planilla.
 
 ### 7. Si cambias de centro o dejas de usarlo
