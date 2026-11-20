@@ -22,7 +22,7 @@ function urlZona(baseUrl, labId, nombre) {
 
 /**
  * Filtra las zonas por ID. Sin IDs (lista vacía o ausente) devuelve todas las que tienen nombre.
- * Cada zona es una fila de la hoja `ubicaciones`: [id, nombre, descripción].
+ * Cada zona es una fila de la hoja `ubicaciones`: [id, nombre, …]; en la etiqueta solo van el código, el nombre y el QR.
  */
 function elegirZonas(zonas, ids) {
   const conNombre = zonas.filter(z => z && (z[1] || '').toString().trim());
@@ -48,7 +48,7 @@ function dibujarQr(doc, texto, x, y, lado) {
 }
 
 function dibujarEtiqueta(doc, zona, indice, x, y, w, h, urlBase, labId) {
-  const [id, nombre, descripcion] = zona;
+  const [id, nombre] = zona;
   const color = COLORES[indice % COLORES.length];
   const cabecera = 38;
 
@@ -64,18 +64,12 @@ function dibujarEtiqueta(doc, zona, indice, x, y, w, h, urlBase, labId) {
   const alto = Math.min(doc.heightOfString(String(nombre), { width: anchoNombre }), altoNombre);
   doc.text(String(nombre), x + 56, y + (cabecera - alto) / 2, { width: anchoNombre, height: altoNombre, ellipsis: true });
 
-  // QR centrado y lo más grande posible; la descripción, si hay, va debajo (centrada)
-  const desc = (descripcion || '').toString().trim();
-  const reservaDesc = desc ? 26 : 0;
-  const libre = h - cabecera - reservaDesc;
-  const lado = Math.min(libre - 12, w - 24);
+  // solo el título y el QR, centrado y lo más grande posible
+  const libre = h - cabecera;
+  const lado = Math.min(libre - 16, w - 24);
   const qx = x + (w - lado) / 2;
   const qy = y + cabecera + (libre - lado) / 2;
   dibujarQr(doc, urlZona(urlBase, labId, nombre), qx, qy, lado);
-  if (desc) {
-    doc.fillColor('#444444').font('Helvetica').fontSize(9)
-      .text(desc, x + 10, y + h - reservaDesc + 2, { width: w - 20, height: reservaDesc - 4, align: 'center', ellipsis: true });
-  }
   doc.restore();
 }
 

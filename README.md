@@ -134,6 +134,9 @@ Estas carpetas del servidor **se conservan entre despliegues** y no están en el
 
 ## Historia y evolución
 
+### Versión 2.4.1 (20 de noviembre de 2026)
+- **PDF de QR:** la etiqueta lleva solo el código, el nombre del armario y el QR; se quitó la descripción de debajo del QR y el QR quedó más grande.
+
 ### Versión 2.4.0 (20 de noviembre de 2026)
 - **Formatos abiertos:** «Exportar mis datos» baja la planilla en **ODS** (OpenDocument) en lugar de `.xlsx`. El enlace viejo `planilla.xlsx` redirige al `.ods`. Si la planilla supera el límite de Google, el aviso sugiere Archivo → Descargar → OpenDocument. Regla del proyecto: las exportaciones salen siempre en formatos abiertos.
 - **Faltan Fotos:** filtro por armario (con la cantidad de materiales sin foto de cada uno, y «Sin ubicación») y exportación de la lista, de todos los armarios o del elegido, a **ODS**, **PDF** (A4, con numeración de páginas) o **CSV** (UTF-8). Se arman en el servidor, sin servicios externos (módulo `listados.js`).
@@ -142,7 +145,7 @@ Estas carpetas del servidor **se conservan entre despliegues** y no están en el
 - **Explorar por armarios:** al pasar el mouse sobre un armario el puntero pasa a manito y el renglón se resalta, como en el resto de las listas.
 
 ### Versión 2.3.1 (20 de noviembre de 2026)
-- **PDF de QR:** nuevo maquetado de las etiquetas: QR centrado y más grande, nombre del armario en hasta dos líneas en la cabecera y descripción debajo solo si existe. Se quitó la leyenda «Escaneá el código…».
+- **PDF de QR:** nuevo maquetado de las etiquetas: QR centrado y más grande, nombre del armario en hasta dos líneas en la cabecera. Se quitó la leyenda «Escaneá el código…».
 
 ### Versión 2.3.0 (20 de noviembre de 2026)
 - **PDF de QR para imprimir:** desde «Impresión de QRs y Gestión de Zonas», el botón «📄 PDF para imprimir (A4)» arma un PDF con 8 etiquetas por hoja, listas para recortar, de los armarios marcados: uno, varios o todos. Los QR se dibujan en el servidor (bibliotecas `pdfkit` y `qrcode`), sin enviar los enlaces a servicios externos. El envío a la hoja `IMPRIMIR_QR` sigue disponible.
