@@ -50,26 +50,32 @@ function dibujarQr(doc, texto, x, y, lado) {
 function dibujarEtiqueta(doc, zona, indice, x, y, w, h, urlBase, labId) {
   const [id, nombre, descripcion] = zona;
   const color = COLORES[indice % COLORES.length];
-  const cabecera = 30;
+  const cabecera = 38;
 
   doc.save();
   doc.lineWidth(0.6).dash(3, { space: 3 }).strokeColor('#999999').rect(x, y, w, h).stroke().undash();
 
   doc.rect(x, y, w, cabecera).fill(color);
   doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(13)
-    .text(codigoZona(id), x + 10, y + 9, { width: 44, lineBreak: false });
-  doc.fontSize(12).text(String(nombre), x + 56, y + 9, { width: w - 66, height: 16, ellipsis: true });
+    .text(codigoZona(id), x + 10, y + (cabecera - 13) / 2 - 1, { width: 44, lineBreak: false });
+  // el nombre ocupa hasta dos líneas, centrado verticalmente en la cabecera
+  doc.fontSize(11.5);
+  const anchoNombre = w - 66, altoNombre = 28;
+  const alto = Math.min(doc.heightOfString(String(nombre), { width: anchoNombre }), altoNombre);
+  doc.text(String(nombre), x + 56, y + (cabecera - alto) / 2, { width: anchoNombre, height: altoNombre, ellipsis: true });
 
-  const lado = Math.min(h - cabecera - 22, 120);
-  const qx = x + 12, qy = y + cabecera + 11;
+  // QR centrado y lo más grande posible; la descripción, si hay, va debajo (centrada)
+  const desc = (descripcion || '').toString().trim();
+  const reservaDesc = desc ? 26 : 0;
+  const libre = h - cabecera - reservaDesc;
+  const lado = Math.min(libre - 12, w - 24);
+  const qx = x + (w - lado) / 2;
+  const qy = y + cabecera + (libre - lado) / 2;
   dibujarQr(doc, urlZona(urlBase, labId, nombre), qx, qy, lado);
-
-  const tx = qx + lado + 12;
-  const tw = x + w - tx - 10;
-  doc.fillColor('#333333').font('Helvetica').fontSize(10)
-    .text((descripcion || '').toString(), tx, qy + 4, { width: tw, height: lado - 34, ellipsis: true });
-  doc.fillColor('#777777').fontSize(8)
-    .text('Escaneá el código para ver el contenido del armario.', tx, qy + lado - 26, { width: tw, height: 26 });
+  if (desc) {
+    doc.fillColor('#444444').font('Helvetica').fontSize(9)
+      .text(desc, x + 10, y + h - reservaDesc + 2, { width: w - 20, height: reservaDesc - 4, align: 'center', ellipsis: true });
+  }
   doc.restore();
 }
 

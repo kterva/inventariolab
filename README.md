@@ -133,6 +133,9 @@ Estas carpetas del servidor **se conservan entre despliegues** y no están en el
 
 ## Historia y evolución
 
+### Versión 2.3.1 (20 de noviembre de 2026)
+- **PDF de QR:** nuevo maquetado de las etiquetas: QR centrado y más grande, nombre del armario en hasta dos líneas en la cabecera y descripción debajo solo si existe. Se quitó la leyenda «Escaneá el código…».
+
 ### Versión 2.3.0 (20 de noviembre de 2026)
 - **PDF de QR para imprimir:** desde «Impresión de QRs y Gestión de Zonas», el botón «📄 PDF para imprimir (A4)» arma un PDF con 8 etiquetas por hoja, listas para recortar, de los armarios marcados: uno, varios o todos. Los QR se dibujan en el servidor (bibliotecas `pdfkit` y `qrcode`), sin enviar los enlaces a servicios externos. El envío a la hoja `IMPRIMIR_QR` sigue disponible.
 
