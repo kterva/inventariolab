@@ -1,6 +1,6 @@
 {
   "name": "inventariolab",
-  "version": "1.0.0",
+  "version": "2.2.1",
   "description": "Gestor de inventario para laboratorios de centros educativos, con Google Sheets como base de datos",
   "main": "server.js",
   "scripts": {

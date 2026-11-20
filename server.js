@@ -17,6 +17,7 @@ const { crearBuscadorFoto, crearLimitador, ErrorBusquedaFoto } = require('./busq
 const { crearRegistro } = require('./registroBusquedas');
 
 const app = express();
+app.locals.appVersion = require("./package.json").version;
 app.set('trust proxy', 1); // Confiar en el proxy de Nginx
 const PORT = process.env.PORT || 3000;
 
