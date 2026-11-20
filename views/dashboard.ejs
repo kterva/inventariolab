@@ -21,7 +21,8 @@
     .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8em; color: white; }
     .badge-roto { background: #e74c3c; }
     .loader { color: #7f8c8d; font-style: italic; padding: 10px 0; text-align: center; }
-    .zone-box { background: #e8f4f8; border: 1px solid #bce0ee; padding: 15px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; color: var(--primary); display: flex; justify-content: space-between; align-items: center; }
+    .zone-box { background: #e8f4f8; border: 1px solid #bce0ee; padding: 15px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; color: var(--primary); display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: background 0.2s; }
+    .zone-box:hover { background: #d6ecf5; }
     .logout-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); padding: 5px 10px; border-radius: 4px; color: white; text-decoration: none; font-size: 0.85rem; margin-left: 10px; }
     .tooltip-icon { display: inline-block; width: 18px; height: 18px; background: #3498db; color: white; border-radius: 50%; text-align: center; font-size: 12px; line-height: 18px; cursor: help; margin-left: 5px; position: relative; vertical-align: middle; }
     .tooltip-icon:hover::after, .tooltip-icon:active::after { content: attr(data-tip); position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%); background: #2c3e50; color: white; padding: 5px 10px; border-radius: 4px; font-size: 12px; z-index: 10; font-weight: normal; width: max-content; max-width: 200px; white-space: normal; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }

@@ -133,6 +133,9 @@ Estas carpetas del servidor **se conservan entre despliegues** y no están en el
 
 ## Historia y evolución
 
+### Versión 2.3.2 (20 de noviembre de 2026)
+- **Explorar por armarios:** al pasar el mouse sobre un armario el puntero pasa a manito y el renglón se resalta, como en el resto de las listas.
+
 ### Versión 2.3.1 (20 de noviembre de 2026)
 - **PDF de QR:** nuevo maquetado de las etiquetas: QR centrado y más grande, nombre del armario en hasta dos líneas en la cabecera y descripción debajo solo si existe. Se quitó la leyenda «Escaneá el código…».
 
@@ -198,7 +201,6 @@ Desarrollada 100 % sobre Google Apps Script, que servía el HTML y usaba la plan
 - La vista del armario muestra el último evento de `HISTORIAL`; las ediciones hechas a mano en la planilla siguen yendo a la columna J (si la planilla tiene el script de Apps Script) y solo se muestran cuando el artículo no tiene eventos en `HISTORIAL`.
 - **Materiales sin foto:** agregar filtro por armario y exportación a ODS o PDF.
 - **Exportaciones de planillas:** siempre en formatos abiertos: ODS, o CSV como alternativa; nunca XLS/XLSX.
-- **Explorar por armarios:** los enlaces no muestran el puntero de manito al pasar el mouse (sí lo hacen en otras vistas); revisar el CSS.
 
 ## Licencia
 

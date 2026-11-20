@@ -78,6 +78,7 @@ test('armario: sin ID no se ofrecen escrituras, y un ID raro se escapa', () => {
 test('dashboard: esc() y scripts válidos', () => {
   const html = ejs.render(vista('dashboard.ejs'), { appVersion: '9.9.9', config, esAdmin: true, rol: 'ADMIN', email: 'yo@x', labId: 'ABC' });
   assert.ok(html.includes('<strong>v9.9.9</strong>'), 'el pie muestra la versión recibida');
+  assert.match(html, /\.zone-box\s*\{[^}]*cursor:\s*pointer/, 'los armarios de «Explorar» muestran la manito');
   scripts(html).forEach((c, i) => new vm.Script(c, { filename: 'dashboard-' + i }));
   const ctx = navegador();
   vm.runInContext(scripts(html).find(c => c.includes('function esc(')), ctx);
