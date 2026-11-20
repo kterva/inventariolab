@@ -132,7 +132,19 @@ Estas carpetas del servidor **se conservan entre despliegues** y no están en el
 
 ## Historia y evolución
 
-### Versión 2.1 (noviembre 2026)
+### Versión 2.2.1 (20 de noviembre de 2026)
+- **Corrección:** la página principal se veía desarmada (botones y textos en columnas sueltas) por un `</div>` de más que cerraba la tarjeta antes de tiempo.
+- **Versionado:** el número del pie de página sale ahora de `package.json` (antes estaba escrito a mano en dos vistas).
+
+### Versión 2.2 (18-19 de noviembre de 2026)
+- **Laboratorios propios:** el botón «Crear mi laboratorio» crea la planilla y la carpeta de fotos en el Drive del docente y lo deja como administrador. Cada laboratorio usa sus propias credenciales de Google (permiso de su dueño o cuenta de servicio) y la app avisa con claridad si el permiso se revoca.
+- **Importar una planilla existente:** selector de Google, elección de columnas y copia a un laboratorio nuevo, sin tocar la original.
+- **Exportar:** la planilla (`.xlsx`) y las fotos (ZIP).
+- **Protección contra bots** al crear laboratorios (token firmado, campo trampa, topes por IP, correo, día y total, Turnstile opcional) y aviso por correo al administrador.
+- **Registro anónimo de búsquedas por foto**, con aviso a los admins cuando hay casos suficientes para verificar el umbral.
+- La app pasa a llamarse **«Inventario Laboratorio»**; licencia GPL-3.0-or-later; README en inglés y guías para docentes y de instalación propia.
+
+### Versión 2.1 (17-18 de noviembre de 2026)
 - **Rendimiento:** cliente único de Google y caché de lectura por planilla. Abrir un armario pasó de ~2,8 s de consultas a Google a ~1 ms con la caché caliente, y se reduce el riesgo de agotar la cuota de la API.
 - **Seguridad:**
   - escapado de todos los datos de la planilla y de los usuarios al armar el HTML;
@@ -177,6 +189,10 @@ Desarrollada 100 % sobre Google Apps Script, que servía el HTML y usaba la plan
 - Cada laboratorio nuevo necesita que un administrador autorice Drive una vez. Las fotos quedan en el Drive de esa cuenta.
 - La búsqueda por foto solo reconoce artículos que ya tienen foto, y su acierto se midió con pocas fotos (8 de 10 entre los 3 primeros). Conviene volver a medir con más fotos.
 - La vista del armario muestra el último evento de `HISTORIAL`; las ediciones hechas a mano en la planilla siguen yendo a la columna J (si la planilla tiene el script de Apps Script) y solo se muestran cuando el artículo no tiene eventos en `HISTORIAL`.
+- **Materiales sin foto:** agregar filtro por armario y exportación a ODS o PDF.
+- **Exportaciones de planillas:** siempre en formatos abiertos: ODS, o CSV como alternativa; nunca XLS/XLSX.
+- **Impresión de QR:** generar un PDF en hoja A4 listo para imprimir desde la app, sin tener que ir a la hoja de la planilla.
+- **Explorar por armarios:** los enlaces no muestran el puntero de manito al pasar el mouse (sí lo hacen en otras vistas); revisar el CSS.
 
 ## Licencia
 
