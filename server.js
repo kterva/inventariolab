@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
+const { Writable } = require('stream');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const googleClient = require('./googleClient');
@@ -12,6 +13,7 @@ const plantilla = require('./plantilla');
 const antibots = require('./antibots');
 const importar = require('./importar');
 const exportar = require('./exportar');
+const qrPdf = require('./qrPdf');
 const avisos = require('./avisos');
 const { crearBuscadorFoto, crearLimitador, ErrorBusquedaFoto } = require('./busquedaFoto');
 const { crearRegistro } = require('./registroBusquedas');
@@ -593,11 +595,35 @@ const exportandoFotos = new Set();
 const MAX_EXPORTACIONES_SIMULTANEAS = 2;
 
 /** Content-Disposition con un nombre legible (con tildes) y uno ASCII de respaldo */
-function adjunto(nombre, extension) {
+function adjunto(nombre, extension, disposicion = 'attachment') {
   const base = exportar.nombreSeguro(nombre, 80);
   const ascii = base.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9 ._()-]/g, '_');
-  return `attachment; filename="${ascii}.${extension}"; filename*=UTF-8''${encodeURIComponent(base + '.' + extension)}`;
+  return `${disposicion}; filename="${ascii}.${extension}"; filename*=UTF-8''${encodeURIComponent(base + '.' + extension)}`;
 }
+
+// PDF A4 con las etiquetas QR de las zonas elegidas (ninguna lista = todas). Se arma en memoria y se envía entero.
+router.post('/lab/:labId/api/qrs.pdf', apiAuth, requireAdmin, async (req, res) => {
+  try {
+    const ids = req.body && req.body.listaIds;
+    if (ids !== undefined && (!Array.isArray(ids) || ids.length > 1000)) {
+      return res.status(400).json({ error: 'Lista de zonas inválida.' });
+    }
+    const zonas = qrPdf.elegirZonas(await googleClient.obtenerZonasAdmin(req.params.labId), ids);
+    if (zonas.length === 0) return res.status(404).json({ error: 'No hay zonas para generar el PDF.' });
+    let baseUrl = process.env.APP_BASE_URL || `http://${req.headers.host}`;
+    if (!baseUrl.endsWith('/inventariolab')) baseUrl += '/inventariolab';
+    const trozos = [];
+    const salida = new Writable({ write(c, _, cb) { trozos.push(c); cb(); } });
+    await qrPdf.generarPdfQr({ zonas, baseUrl, labId: req.params.labId, salida, titulo: `QR - ${req.appConfig.laboratorio}` });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', adjunto(`QR - ${req.appConfig.laboratorio}`, 'pdf', 'inline'));
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(Buffer.concat(trozos));
+  } catch (err) {
+    console.error('[qrs.pdf]', err.message);
+    res.status(500).json({ error: 'No se pudo generar el PDF. Probá de nuevo.' });
+  }
+});
 
 router.get('/lab/:labId/exportar/planilla.xlsx', apiAuth, requireAdmin, async (req, res) => {
   try {

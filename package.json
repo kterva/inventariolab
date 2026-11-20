@@ -1,6 +1,6 @@
 {
   "name": "inventariolab",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "description": "Gestor de inventario para laboratorios de centros educativos, con Google Sheets como base de datos",
   "main": "server.js",
   "scripts": {
@@ -22,7 +22,9 @@
     "googleapis": "^173.0.0",
     "nodemailer": "^10.6.0",
     "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0"
+    "passport-google-oauth20": "^2.0.0",
+    "pdfkit": "^0.21.0",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

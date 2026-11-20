@@ -87,8 +87,8 @@ Guarda la dirección de tu laboratorio o agrégala a la pantalla de inicio del c
 
 1. En el panel de administración, entra a **Gestión de zonas** y agrega tus armarios (por ejemplo "Armario 1" o "Bajo mesada").
 2. Asigna cada material a su armario.
-3. Toca **Impresión de QR**, elige los armarios e **imprime las etiquetas**. Pégalas en cada armario.
-   > *Qué pasa:* la aplicación agrega a tu planilla una hoja **IMPRIMIR_QR** con las etiquetas. Cada QR contiene la dirección del armario **dentro de la aplicación**.
+3. Toca **Impresión de QR**, marca uno, varios o todos los armarios y toca **PDF para imprimir (A4)**. Imprímelo, recorta las etiquetas y pégalas en cada armario.
+   > *Qué pasa:* la aplicación arma un PDF con 8 etiquetas por hoja A4. Cada QR contiene la dirección del armario **dentro de la aplicación**. Si prefieres imprimir desde la planilla, el botón **Enviar a la hoja IMPRIMIR_QR** agrega esa hoja con las etiquetas.
 4. Prueba con el celular: al escanear un QR debe abrir el contenido de ese armario.
 
 ### 4. Invitar a tus colegas

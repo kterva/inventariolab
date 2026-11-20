@@ -143,8 +143,13 @@
     
     <div style="background: #e8f4f8; padding: 10px; border-radius: 4px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #bce0ee;">
       <label style="cursor:pointer; font-weight:bold; color:#1a5276;"><input type="checkbox" id="checkAllZones" onclick="toggleAll(this.checked)"> Seleccionar todos</label>
-      <button id="btnQR" onclick="triggerQR(true)" style="width: auto; margin: 0; background: #27ae60; padding: 6px 15px;">🖨️ Imprimir Seleccionados</button>
+      <span id="qrContador" style="color:#1a5276; font-size:0.9rem;">Ninguno seleccionado</span>
     </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+      <button id="btnPdfQR" onclick="descargarPdfQR()" style="width:auto; margin:0; background:#27ae60; padding:6px 15px;">📄 PDF para imprimir (A4)</button>
+      <button id="btnQR" onclick="triggerQR(true)" style="width:auto; margin:0; background:#7f8c8d; padding:6px 15px;">📋 Enviar a la hoja IMPRIMIR_QR</button>
+    </div>
+    <p style="font-size:0.8rem; color:#718096; margin:0 0 10px;">Marcá un armario, varios o todos. El PDF trae 8 etiquetas por hoja A4, listas para recortar.</p>
 
     <div id="zoneList"></div>
     <hr>
@@ -509,6 +514,7 @@
           </div>
         </div>`
       ).join('');
+      actualizarContadorQR();
     } catch (err) {
       div.innerHTML = '<div class="loader" style="color:#e74c3c">❌ Error al cargar zonas: ' + esc(err.message) + '</div>';
     }
@@ -617,12 +623,50 @@
     } catch (err) {
       alert('Error al generar QRs: ' + err.message);
     }
-    if (btn) { btn.innerText = '🖨️ Imprimir Seleccionados'; btn.disabled = false; }
+    if (btn) { btn.innerText = '📋 Enviar a la hoja IMPRIMIR_QR'; btn.disabled = false; }
   }
 
   function toggleAll(source) {
     const checkboxes = document.getElementsByName('zoneSelect');
     checkboxes.forEach(cb => cb.checked = source);
+    actualizarContadorQR();
+  }
+
+  function actualizarContadorQR() {
+    const cbs = Array.from(document.getElementsByName('zoneSelect'));
+    const n = cbs.filter(cb => cb.checked).length;
+    const el = document.getElementById('qrContador');
+    if (el) el.innerText = n === 0 ? 'Ninguno seleccionado' : (n === 1 ? '1 seleccionado' : n + ' seleccionados');
+    const todos = document.getElementById('checkAllZones');
+    if (todos) todos.checked = cbs.length > 0 && n === cbs.length;
+  }
+  document.addEventListener('change', e => { if (e.target && e.target.name === 'zoneSelect') actualizarContadorQR(); });
+
+  // Pide el PDF de los armarios marcados y lo abre en otra pestaña para imprimirlo
+  async function descargarPdfQR() {
+    const ids = Array.from(document.getElementsByName('zoneSelect')).filter(cb => cb.checked).map(cb => cb.value);
+    if (ids.length === 0) return alert('Marcá al menos un armario (o "Seleccionar todos").');
+    const btn = document.getElementById('btnPdfQR');
+    btn.innerText = '⏳ Armando PDF...'; btn.disabled = true;
+    try {
+      const res = await fetch(`/inventariolab/lab/${LAB_ID}/api/qrs.pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listaIds: ids })
+      });
+      if (!res.ok) {
+        let msg = 'Error de servidor';
+        try { msg = (await res.json()).error || msg; } catch (_) {}
+        throw new Error(msg);
+      }
+      const url = URL.createObjectURL(await res.blob());
+      const w = window.open(url, '_blank');
+      if (!w) { const a = document.createElement('a'); a.href = url; a.download = 'qr-armarios.pdf'; a.click(); }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      alert('Error al generar el PDF: ' + err.message);
+    }
+    btn.innerText = '📄 PDF para imprimir (A4)'; btn.disabled = false;
   }
 
   // Registrar Service Worker para la PWA

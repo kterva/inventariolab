@@ -126,11 +126,15 @@ Estas carpetas del servidor **se conservan entre despliegues** y no están en el
 | `sessionStore.js` | Almacén de sesiones en archivos. |
 | `driveUsuario.js` | Autorización de Drive con la cuenta de un admin (OAuth, alcance `drive.file`): con ella se suben las fotos. |
 | `busquedaFoto.js` | Búsqueda por foto: embeddings de imagen (DINOv2-small, local), índice por laboratorio, cola y límite por usuario. |
+| `qrPdf.js` | PDF A4 con las etiquetas QR de los armarios elegidos (8 por hoja), con QR vectoriales generados localmente. |
 | `views/*.ejs` | Vistas (portada, login, dashboard, armario, ayuda, privacidad). |
 | `public/` | PWA: manifest, service worker e íconos. |
 | `WebApp.js`, `Index.html`, `Gatillos.js`, `GenerarQR_PRO.js`, `Gestion_Incidencias.js`, `Recuperar_reportes.js`, `appsscript.json`, `.clasp.json` | **Versión 1.x (Google Apps Script)**, conservada como referencia; la app de Node no los usa. |
 
 ## Historia y evolución
+
+### Versión 2.3.0 (20 de noviembre de 2026)
+- **PDF de QR para imprimir:** desde «Impresión de QRs y Gestión de Zonas», el botón «📄 PDF para imprimir (A4)» arma un PDF con 8 etiquetas por hoja, listas para recortar, de los armarios marcados: uno, varios o todos. Los QR se dibujan en el servidor (bibliotecas `pdfkit` y `qrcode`), sin enviar los enlaces a servicios externos. El envío a la hoja `IMPRIMIR_QR` sigue disponible.
 
 ### Versión 2.2.1 (20 de noviembre de 2026)
 - **Corrección:** la página principal se veía desarmada (botones y textos en columnas sueltas) por un `</div>` de más que cerraba la tarjeta antes de tiempo.
@@ -191,7 +195,6 @@ Desarrollada 100 % sobre Google Apps Script, que servía el HTML y usaba la plan
 - La vista del armario muestra el último evento de `HISTORIAL`; las ediciones hechas a mano en la planilla siguen yendo a la columna J (si la planilla tiene el script de Apps Script) y solo se muestran cuando el artículo no tiene eventos en `HISTORIAL`.
 - **Materiales sin foto:** agregar filtro por armario y exportación a ODS o PDF.
 - **Exportaciones de planillas:** siempre en formatos abiertos: ODS, o CSV como alternativa; nunca XLS/XLSX.
-- **Impresión de QR:** generar un PDF en hoja A4 listo para imprimir desde la app, sin tener que ir a la hoja de la planilla.
 - **Explorar por armarios:** los enlaces no muestran el puntero de manito al pasar el mouse (sí lo hacen en otras vistas); revisar el CSS.
 
 ## Licencia

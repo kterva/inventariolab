@@ -19,7 +19,7 @@ const fila = { id: 'A0007', fila: 7, articulo: 'Probeta ' + X, bien: 2, regular:
 const config = { laboratorio: 'Lab', institucion: 'Liceo', esAdmin: true, autorizado: true, puedeReportar: true, email: 'yo@x', zonasAdmin: ['Z1', X] };
 
 function cargarArmario(cfg) {
-  const html = ejs.render(vista('armario.ejs'), { zona: 'Z1', filas: [fila], config: cfg, labId: 'ABC',
+  const html = ejs.render(vista('armario.ejs'), { appVersion: '9.9.9', zona: 'Z1', filas: [fila], config: cfg, labId: 'ABC',
     urlLogin: '/inventariolab/lab/ABC/login?redirect=%2Finventariolab%2Flab%2FABC%3Fzona%3DZ1',
     urlCambiarCuenta: '/inventariolab/lab/ABC/logout?redirect=%2Finventariolab%2Flab%2FABC%3Fzona%3DZ1' });
   const sc = scripts(html);
@@ -76,7 +76,8 @@ test('armario: sin ID no se ofrecen escrituras, y un ID raro se escapa', () => {
 });
 
 test('dashboard: esc() y scripts válidos', () => {
-  const html = ejs.render(vista('dashboard.ejs'), { config, esAdmin: true, rol: 'ADMIN', email: 'yo@x', labId: 'ABC' });
+  const html = ejs.render(vista('dashboard.ejs'), { appVersion: '9.9.9', config, esAdmin: true, rol: 'ADMIN', email: 'yo@x', labId: 'ABC' });
+  assert.ok(html.includes('<strong>v9.9.9</strong>'), 'el pie muestra la versión recibida');
   scripts(html).forEach((c, i) => new vm.Script(c, { filename: 'dashboard-' + i }));
   const ctx = navegador();
   vm.runInContext(scripts(html).find(c => c.includes('function esc(')), ctx);

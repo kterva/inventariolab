@@ -508,3 +508,39 @@ test('importar mi planilla: elegir con el selector, mapear columnas y copiar a u
     assert.equal(fs.readdirSync(tokens).length, 1);
   } finally { await s.parar(); }
 });
+
+test('PDF de QR: solo admins; sale un PDF A4 con las zonas elegidas (una, algunas o todas)', async () => {
+  const pedir = (s, cookie, cuerpo) => fetch(`${s.base}/api/qrs.pdf`, { method: 'POST', redirect: 'manual',
+    headers: { 'content-type': 'application/json', ...(cookie && { cookie }) }, body: JSON.stringify(cuerpo) });
+  const paginas = buf => (buf.toString('latin1').match(/\/Type \/Page\b/g) || []).length;
+
+  let s = await arrancar({ MODO_DEMO: 'NO' });
+  try { assert.equal((await pedir(s, '', { listaIds: [] })).status, 401); } finally { await s.parar(); }
+
+  s = await arrancar({ MODO_DEMO: 'SI', DEMO_ROL: 'LECTOR' });
+  try {
+    const http = cliente();
+    const cookie = (await http(s.base)).cookie();
+    assert.equal((await pedir(s, cookie, { listaIds: [] })).status, 403);
+  } finally { await s.parar(); }
+
+  s = await arrancar({ MODO_DEMO: 'SI', DEMO_ROL: 'ADMIN' });
+  try {
+    const http = cliente();
+    const abierto = await http(s.base);
+    const cookie = abierto.cookie();
+    assert.ok(abierto.texto.includes('api/qrs.pdf') && abierto.texto.includes('PDF para imprimir'), 'el dashboard ofrece el PDF');
+
+    for (const lista of [['Z01'], ['Z01', 'Z02'], [], undefined]) {
+      const r = await pedir(s, cookie, lista === undefined ? {} : { listaIds: lista });
+      assert.equal(r.status, 200, JSON.stringify(lista));
+      assert.equal(r.headers.get('content-type'), 'application/pdf');
+      assert.match(r.headers.get('content-disposition'), /^inline; filename="[^"]*\.pdf"/);
+      const buf = Buffer.from(await r.arrayBuffer());
+      assert.equal(buf.subarray(0, 5).toString(), '%PDF-');
+      assert.equal(paginas(buf), 1);
+    }
+    assert.equal((await pedir(s, cookie, { listaIds: ['Z99'] })).status, 404, 'ninguna zona coincide');
+    assert.equal((await pedir(s, cookie, { listaIds: 'Z01' })).status, 400, 'la lista debe ser un arreglo');
+  } finally { await s.parar(); }
+});

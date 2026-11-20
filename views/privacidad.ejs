@@ -63,7 +63,7 @@
     <ul>
       <li><strong>Google</strong>: inicio de sesión, Google Sheets y Google Drive (donde están los datos del centro) y Google Fonts (tipografías).</li>
       <li><strong>Cloudflare</strong>: intermediario de red que protege y acelera el acceso al sitio.</li>
-      <li><strong>api.qrserver.com</strong>: cuando un administrador genera las etiquetas QR, este servicio recibe el enlace de cada zona para dibujar el código.</li>
+      <li><strong>api.qrserver.com</strong>: solo cuando un administrador envía las etiquetas QR a la hoja <code>IMPRIMIR_QR</code> de la planilla, este servicio recibe el enlace de cada zona para dibujar el código. El PDF para imprimir se arma en nuestro servidor, sin enviar nada a terceros.</li>
     </ul>
   </div>
 
